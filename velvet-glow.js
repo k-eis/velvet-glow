@@ -17,6 +17,12 @@ const apoSharpSlider = document.getElementById('apoSharp');
 const microContrastSlider = document.getElementById('microContrast');
 const glowSlider = document.getElementById('glow');
 const toneRolloffSlider = document.getElementById('toneRolloff');
+const grainSlider = document.getElementById('grain');
+const colorTempSlider = document.getElementById('colorTemp');
+const saturationSlider = document.getElementById('saturation');
+const vignetteSlider = document.getElementById('vignette');
+const softFocusSlider = document.getElementById('softFocus');
+const lightLeakSlider = document.getElementById('lightLeak');
 const monochromeCheckbox = document.getElementById('monochrome');
 
 const ccdColorVal = document.getElementById('ccdColorVal');
@@ -24,10 +30,17 @@ const apoSharpVal = document.getElementById('apoSharpVal');
 const microContrastVal = document.getElementById('microContrastVal');
 const glowVal = document.getElementById('glowVal');
 const toneRolloffVal = document.getElementById('toneRolloffVal');
+const grainVal = document.getElementById('grainVal');
+const colorTempVal = document.getElementById('colorTempVal');
+const saturationVal = document.getElementById('saturationVal');
+const vignetteVal = document.getElementById('vignetteVal');
+const softFocusVal = document.getElementById('softFocusVal');
+const lightLeakVal = document.getElementById('lightLeakVal');
 
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
 const themeBtns = document.querySelectorAll('.theme-btn');
+const patchBtns = document.querySelectorAll('.profile-btn');
 
 let originalImage = null;
 let originalImageData = null;
@@ -105,6 +118,26 @@ function requestApply() {
 }
 
 // ── スライディングウィンドウのボックスブラー（半径によらず高速）
+// ── 決定論的な擬似ランダム／ノイズ（GRAIN・LIGHT LEAKに使用）
+function pseudoRandom2D(x, y) {
+  const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+function smoothNoise2D(x, y, scale) {
+  const sx = x / scale, sy = y / scale;
+  const x0 = Math.floor(sx), y0 = Math.floor(sy);
+  const fx = sx - x0, fy = sy - y0;
+  const v00 = pseudoRandom2D(x0, y0);
+  const v10 = pseudoRandom2D(x0+1, y0);
+  const v01 = pseudoRandom2D(x0, y0+1);
+  const v11 = pseudoRandom2D(x0+1, y0+1);
+  const sfx = fx*fx*(3-2*fx);
+  const sfy = fy*fy*(3-2*fy);
+  const top = v00 + (v10 - v00) * sfx;
+  const bottom = v01 + (v11 - v01) * sfx;
+  return top + (bottom - top) * sfy;
+}
+
 function boxBlur(data, w, h, radius) {
   if (radius < 1) return data.slice();
   const r = Math.max(1, Math.round(radius));
@@ -163,6 +196,12 @@ function applyVelvetGlow(preview) {
   const microContrast = parseInt(microContrastSlider.value) / 100;
   const glow = parseInt(glowSlider.value) / 100;
   const toneRolloff = parseInt(toneRolloffSlider.value) / 100;
+  const grain = parseInt(grainSlider.value) / 100;
+  const colorTemp = (parseInt(colorTempSlider.value) - 50) / 50; // -1(寒色)〜0(中間)〜+1(暖色)
+  const saturation = (parseInt(saturationSlider.value) - 50) / 50; // -1(彩度低)〜0〜+1(彩度高)
+  const vignette = parseInt(vignetteSlider.value) / 100;
+  const softFocus = parseInt(softFocusSlider.value) / 100;
+  const lightLeak = parseInt(lightLeakSlider.value) / 100;
   const mono = monochromeCheckbox.checked;
 
   const src = useData.data;
@@ -254,6 +293,79 @@ function applyVelvetGlow(preview) {
     }
   }
 
+  // ── STEP 5: SOFT FOCUS（画面全体を軽くぼかしてブレンド。プラスチックレンズの柔らかさ）
+  if (softFocus > 0.01) {
+    const blurred = boxBlur(out, w, h, (2 + softFocus * 10) * Math.max(radiusScale, 0.35));
+    const next = new Uint8ClampedArray(out.length);
+    for (let i = 0; i < out.length; i += 4) {
+      next[i]   = out[i]   * (1-softFocus*0.6) + blurred[i]   * (softFocus*0.6);
+      next[i+1] = out[i+1] * (1-softFocus*0.6) + blurred[i+1] * (softFocus*0.6);
+      next[i+2] = out[i+2] * (1-softFocus*0.6) + blurred[i+2] * (softFocus*0.6);
+      next[i+3] = out[i+3];
+    }
+    out = next;
+  }
+
+  // ── STEP 6: COLOR TEMP + SATURATION（色温度と彩度。1パスのper-pixel処理）
+  if (Math.abs(colorTemp) > 0.01 || Math.abs(saturation) > 0.01) {
+    for (let i = 0; i < out.length; i += 4) {
+      let r = out[i], g = out[i+1], b = out[i+2];
+      // COLOR TEMP：暖色側で赤黄を、寒色側で青を持ち上げる
+      if (colorTemp > 0) { r += colorTemp*22; g += colorTemp*8; b -= colorTemp*14; }
+      else { b += -colorTemp*22; r += colorTemp*14; }
+      // SATURATION：平均輝度からの距離を伸縮
+      const avg = (r+g+b)/3;
+      const satMul = 1 + saturation*0.7;
+      r = avg + (r-avg)*satMul; g = avg + (g-avg)*satMul; b = avg + (b-avg)*satMul;
+      out[i] = Math.max(0,Math.min(255,r)); out[i+1] = Math.max(0,Math.min(255,g)); out[i+2] = Math.max(0,Math.min(255,b));
+    }
+  }
+
+  // ── STEP 7: GRAIN（CCD特有の粒状感。輝度ノイズ＋わずかな色ノイズ）
+  if (grain > 0.01) {
+    const seedOff = 4000;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y*w+x)*4;
+        const n = (pseudoRandom2D(x+seedOff, y+seedOff) - 0.5) * 2;
+        const lumNoise = n * grain * 24;
+        const cn = (pseudoRandom2D(x-seedOff, y+seedOff) - 0.5) * 2;
+        const chromaNoise = cn * grain * 8;
+        out[i]   = out[i]   + lumNoise + chromaNoise;
+        out[i+1] = out[i+1] + lumNoise;
+        out[i+2] = out[i+2] + lumNoise - chromaNoise;
+      }
+    }
+  }
+
+  // ── STEP 8: VIGNETTE（周辺減光）
+  if (vignette > 0.01) {
+    const cx = w/2, cy = h/2, maxDist = Math.sqrt(cx*cx+cy*cy);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = Math.sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy)) / maxDist;
+        const darken = 1 - Math.max(0, d - 0.35) * vignette * 1.3;
+        const i = (y*w+x)*4;
+        out[i] *= darken; out[i+1] *= darken; out[i+2] *= darken;
+      }
+    }
+  }
+
+  // ── STEP 9: LIGHT LEAK（角からの暖色フレア。主にHolga向け）
+  if (lightLeak > 0.01) {
+    const cx = w * 0.85, cy = h * 0.1, maxDist = Math.sqrt(w*w+h*h) * 0.6;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = Math.sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy)) / maxDist;
+        const amt = Math.max(0, 1 - d) * lightLeak * 0.8;
+        const i = (y*w+x)*4;
+        out[i]   = out[i]   + amt*180;
+        out[i+1] = out[i+1] + amt*70;
+        out[i+2] = out[i+2] - amt*30;
+      }
+    }
+  }
+
   if (mono) {
     for (let i = 0; i < out.length; i += 4) {
       const gray = out[i]*0.299 + out[i+1]*0.587 + out[i+2]*0.114;
@@ -276,7 +388,7 @@ function applyVelvetGlow(preview) {
 }
 
 // ── UIイベント
-const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider];
+const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider, grainSlider, colorTempSlider, saturationSlider, vignetteSlider, softFocusSlider, lightLeakSlider];
 allSliders.forEach(slider => {
   slider.addEventListener('pointerdown', () => { isDragging = true; });
   slider.addEventListener('touchstart', () => { isDragging = true; }, { passive: true });
@@ -299,6 +411,20 @@ apoSharpSlider.addEventListener('input', () => { apoSharpVal.textContent = apoSh
 microContrastSlider.addEventListener('input', () => { microContrastVal.textContent = microContrastSlider.value + '%'; requestApply(); });
 glowSlider.addEventListener('input', () => { glowVal.textContent = glowSlider.value + '%'; requestApply(); });
 toneRolloffSlider.addEventListener('input', () => { toneRolloffVal.textContent = toneRolloffSlider.value + '%'; requestApply(); });
+grainSlider.addEventListener('input', () => { grainVal.textContent = grainSlider.value + '%'; requestApply(); });
+colorTempSlider.addEventListener('input', () => {
+  const v = parseInt(colorTempSlider.value);
+  colorTempVal.textContent = v === 50 ? '中間' : (v < 50 ? `寒色${50-v}` : `暖色${v-50}`);
+  requestApply();
+});
+saturationSlider.addEventListener('input', () => {
+  const v = parseInt(saturationSlider.value);
+  saturationVal.textContent = v === 50 ? '中間' : (v < 50 ? `-${50-v}` : `+${v-50}`);
+  requestApply();
+});
+vignetteSlider.addEventListener('input', () => { vignetteVal.textContent = vignetteSlider.value + '%'; requestApply(); });
+softFocusSlider.addEventListener('input', () => { softFocusVal.textContent = softFocusSlider.value + '%'; requestApply(); });
+lightLeakSlider.addEventListener('input', () => { lightLeakVal.textContent = lightLeakSlider.value + '%'; requestApply(); });
 monochromeCheckbox.addEventListener('change', () => applyVelvetGlow());
 
 // ── テーマ切り替え（Optical Glass / Brass × Leather）
@@ -318,6 +444,49 @@ try {
 } catch(e) {}
 
 // ── 保存（iOS対応：オーバーレイ方式）
+// ── CAMERA PATCH：10台のカメラの個性＋初期化
+// sat/tempは50が中間（スライダーの生値）。それ以外は0-100のスライダー生値。
+const CAMERA_PATCHES = {
+  init:      { ccdColor:0,  apoSharp:0,  microContrast:0,  glow:0,  toneRolloff:0,  grain:0,  colorTemp:50, saturation:50, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // 初期化
+  lvelvet:   { ccdColor:55, apoSharp:25, microContrast:35, glow:45, toneRolloff:35, grain:30, colorTemp:42, saturation:55, vignette:20, softFocus:10, lightLeak:0,  mono:false }, // Leica M8
+  fvelvet:   { ccdColor:30, apoSharp:20, microContrast:15, glow:20, toneRolloff:60, grain:15, colorTemp:60, saturation:45, vignette:5,  softFocus:15, lightLeak:0,  mono:false }, // Fuji S5 Pro
+  spresence: { ccdColor:40, apoSharp:70, microContrast:80, glow:0,  toneRolloff:15, grain:5,  colorTemp:50, saturation:65, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sigma DP2 Merrill
+  rsharp:    { ccdColor:25, apoSharp:65, microContrast:60, glow:5,  toneRolloff:10, grain:35, colorTemp:50, saturation:30, vignette:15, softFocus:0,  lightLeak:0,  mono:true  }, // Ricoh GR Digital
+  gchrome:   { ccdColor:15, apoSharp:15, microContrast:10, glow:10, toneRolloff:35, grain:25, colorTemp:32, saturation:30, vignette:10, softFocus:5,  lightLeak:0,  mono:false }, // Canon G3
+  xfilm:     { ccdColor:35, apoSharp:30, microContrast:20, glow:25, toneRolloff:40, grain:10, colorTemp:58, saturation:50, vignette:5,  softFocus:0,  lightLeak:0,  mono:false }, // Fuji X100
+  ptdeep:    { ccdColor:35, apoSharp:35, microContrast:50, glow:5,  toneRolloff:10, grain:20, colorTemp:38, saturation:55, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Pentax K10D
+  czuiko:    { ccdColor:20, apoSharp:25, microContrast:20, glow:10, toneRolloff:20, grain:15, colorTemp:35, saturation:45, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Olympus C-5050
+  kmemory:   { ccdColor:60, apoSharp:20, microContrast:20, glow:15, toneRolloff:30, grain:20, colorTemp:70, saturation:55, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Kodak P880
+  hdream:    { ccdColor:20, apoSharp:0,  microContrast:5,  glow:20, toneRolloff:60, grain:35, colorTemp:58, saturation:35, vignette:70, softFocus:55, lightLeak:60, mono:false }, // Holga 120N
+};
+
+function setSlider(slider, valEl, value, formatter) {
+  slider.value = value;
+  valEl.textContent = formatter ? formatter(value) : value + '%';
+}
+
+patchBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = CAMERA_PATCHES[btn.dataset.patch];
+    if (!p) return;
+    setSlider(ccdColorSlider, ccdColorVal, p.ccdColor);
+    setSlider(apoSharpSlider, apoSharpVal, p.apoSharp);
+    setSlider(microContrastSlider, microContrastVal, p.microContrast);
+    setSlider(glowSlider, glowVal, p.glow);
+    setSlider(toneRolloffSlider, toneRolloffVal, p.toneRolloff);
+    setSlider(grainSlider, grainVal, p.grain);
+    setSlider(colorTempSlider, colorTempVal, p.colorTemp, v => v===50?'中間':(v<50?`寒色${50-v}`:`暖色${v-50}`));
+    setSlider(saturationSlider, saturationVal, p.saturation, v => v===50?'中間':(v<50?`-${50-v}`:`+${v-50}`));
+    setSlider(vignetteSlider, vignetteVal, p.vignette);
+    setSlider(softFocusSlider, softFocusVal, p.softFocus);
+    setSlider(lightLeakSlider, lightLeakVal, p.lightLeak);
+    monochromeCheckbox.checked = p.mono;
+    patchBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    requestApply();
+  });
+});
+
 downloadBtn.addEventListener('click', () => {
   try {
     const dataUrl = outputCanvas.toDataURL('image/png');

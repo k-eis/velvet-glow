@@ -113,6 +113,15 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .footer-links a { flex: 1; padding: 11px 14px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: 500 10px/1 var(--sans); letter-spacing: 0.03em; text-align: center; text-decoration: none; cursor: pointer; }
 .footer-links a:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ── Camera Patch グリッド ── */
+.profile-grid { display: grid; gap: 6px; }
+.profile-btn { border: 1px solid var(--line-strong); padding: 8px 8px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: all 0.12s; }
+.profile-btn:hover { border-color: var(--accent); }
+.profile-btn.active { background: var(--accent); border-color: var(--accent); }
+.profile-btn.active .profile-name, .profile-btn.active .profile-desc { color: #14181a; }
+.profile-name { font: 600 10.5px/1.2 var(--sans); color: var(--ink); }
+.profile-desc { font: 400 8.5px/1.2 var(--sans); color: var(--muted); margin-top: 2px; }
+
 @media (max-width: 860px) {
   .wrap { padding: 20px 16px 50px; }
   header { flex-direction: column; align-items: flex-start; gap: 10px; padding-bottom: 16px; margin-bottom: 20px; }
@@ -126,6 +135,10 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
   input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
   .btn { padding: 16px; font-size: 12px; }
   .footer-links { flex-direction: column; }
+  .profile-grid { grid-template-columns: 1fr 1fr !important; }
+  .profile-btn { padding: 13px 10px; }
+  .profile-name { font-size: 13px; }
+  .profile-desc { font-size: 10px; }
 }
 </style>
 </head>
@@ -211,9 +224,74 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
       </div>
 
       <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">GRAIN <span class="jp-small">粒状感</span></span>
+          <span class="val" id="grainVal">0%</span>
+        </div>
+        <input type="range" id="grain" min="0" max="100" value="0">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">COLOR TEMP <span class="jp-small">色温度（寒色⇄暖色）</span></span>
+          <span class="val" id="colorTempVal">中間</span>
+        </div>
+        <input type="range" id="colorTemp" min="0" max="100" value="50">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">SATURATION <span class="jp-small">彩度</span></span>
+          <span class="val" id="saturationVal">中間</span>
+        </div>
+        <input type="range" id="saturation" min="0" max="100" value="50">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">VIGNETTE <span class="jp-small">周辺減光</span></span>
+          <span class="val" id="vignetteVal">0%</span>
+        </div>
+        <input type="range" id="vignette" min="0" max="100" value="0">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">SOFT FOCUS <span class="jp-small">ソフトフォーカス</span></span>
+          <span class="val" id="softFocusVal">0%</span>
+        </div>
+        <input type="range" id="softFocus" min="0" max="100" value="0">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">LIGHT LEAK <span class="jp-small">光漏れ</span></span>
+          <span class="val" id="lightLeakVal">0%</span>
+        </div>
+        <input type="range" id="lightLeak" min="0" max="100" value="0">
+      </div>
+
+      <div class="ctrl-group">
         <div class="checkbox-row">
           <input type="checkbox" id="monochrome">
           <label for="monochrome">MONOCHROME <span style="opacity:0.6;font-weight:400;">/ Mモノクローム風</span></label>
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span class="name">CAMERA PATCH <span class="jp-small">10台の個性</span></span></div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="init"><span class="profile-name">初期化</span><span class="profile-desc">Init</span></div>
+          <div class="profile-btn" data-patch="lvelvet"><span class="profile-name">L Velvet</span><span class="profile-desc">Leica M8</span></div>
+          <div class="profile-btn" data-patch="fvelvet"><span class="profile-name">F Velvet</span><span class="profile-desc">Fuji S5 Pro</span></div>
+          <div class="profile-btn" data-patch="spresence"><span class="profile-name">S Presence</span><span class="profile-desc">Sigma DP2M</span></div>
+          <div class="profile-btn" data-patch="rsharp"><span class="profile-name">R シャープ</span><span class="profile-desc">Ricoh GR</span></div>
+          <div class="profile-btn" data-patch="gchrome"><span class="profile-name">G Chrome</span><span class="profile-desc">Canon G3</span></div>
+          <div class="profile-btn" data-patch="xfilm"><span class="profile-name">X Film</span><span class="profile-desc">Fuji X100</span></div>
+          <div class="profile-btn" data-patch="ptdeep"><span class="profile-name">Pt Deep</span><span class="profile-desc">Pentax K10D</span></div>
+          <div class="profile-btn" data-patch="czuiko"><span class="profile-name">C Zuiko</span><span class="profile-desc">Olympus C-5050</span></div>
+          <div class="profile-btn" data-patch="kmemory"><span class="profile-name">K Memory</span><span class="profile-desc">Kodak P880</span></div>
+          <div class="profile-btn" data-patch="hdream"><span class="profile-name">H Dream</span><span class="profile-desc">Holga 120N</span></div>
         </div>
       </div>
 
