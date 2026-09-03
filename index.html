@@ -128,7 +128,16 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
   h1 { font-size: 24px; }
   h1 .jp { display: block; margin-left: 0; margin-top: 4px; }
   .stage { grid-template-columns: 1fr; border: none; }
-  .canvas-area { border: 1px solid var(--line-strong); border-bottom: none; min-height: 220px; }
+  .canvas-area {
+    border: 1px solid var(--line-strong);
+    border-bottom: none;
+    min-height: 220px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+  }
+  canvas#outputCanvas { max-height: 42vh; }
   .controls { border: 1px solid var(--line-strong); border-top: none; padding: 18px 16px; }
   input[type="range"] { height: 4px; margin: 8px 0; }
   input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
@@ -149,8 +158,8 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
     <div>
       <div class="filter-tag">k-eis DESIGN FILTER 00-α</div>
       <h1>Velvet Glow <span class="jp">ビロードのにじみ</span></h1>
-      <div class="tagline">The Leica look, translated — deep color, quiet sharpness, a debated glow.</div>
-      <div class="tagline" style="margin-top:2px; opacity:0.85;">ライカの風合いを翻訳する——深い色、静かな解像感、賛否あるにじみ。</div>
+      <div class="tagline">Translating the quiet air of a photograph — deep color, quiet sharpness, a soft glow.</div>
+      <div class="tagline" style="margin-top:2px; opacity:0.85;">写真の静かな空気感を翻訳する——深い色、静かな解像感、柔らかなにじみ。</div>
       <div class="private-badge">PERSONAL / UNLISTED</div>
     </div>
     <div class="version">© 2026 k-eis studio</div>
@@ -209,7 +218,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 
       <div class="ctrl-group">
         <div class="ctrl-label">
-          <span class="name">GLOW <span class="jp-small">にじみ（賛否あり）</span></span>
+          <span class="name">GLOW <span class="jp-small">にじみ</span></span>
           <span class="val" id="glowVal">15%</span>
         </div>
         <input type="range" id="glow" min="0" max="100" value="15">
@@ -221,6 +230,14 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
           <span class="val" id="toneRolloffVal">30%</span>
         </div>
         <input type="range" id="toneRolloff" min="0" max="100" value="30">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">CRUSH <span class="jp-small">階調を締める</span></span>
+          <span class="val" id="crushVal">0%</span>
+        </div>
+        <input type="range" id="crush" min="0" max="100" value="0">
       </div>
 
       <div class="ctrl-group">
@@ -285,13 +302,15 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
           <div class="profile-btn" data-patch="lvelvet"><span class="profile-name">L Velvet</span><span class="profile-desc">Leica M8</span></div>
           <div class="profile-btn" data-patch="fvelvet"><span class="profile-name">F Velvet</span><span class="profile-desc">Fuji S5 Pro</span></div>
           <div class="profile-btn" data-patch="spresence"><span class="profile-name">S Presence</span><span class="profile-desc">Sigma DP2M</span></div>
-          <div class="profile-btn" data-patch="rsharp"><span class="profile-name">R シャープ</span><span class="profile-desc">Ricoh GR</span></div>
+          <div class="profile-btn" data-patch="rsharp"><span class="profile-name">R Sharp</span><span class="profile-desc">Ricoh GR</span></div>
           <div class="profile-btn" data-patch="gchrome"><span class="profile-name">G Chrome</span><span class="profile-desc">Canon G3</span></div>
           <div class="profile-btn" data-patch="xfilm"><span class="profile-name">X Film</span><span class="profile-desc">Fuji X100</span></div>
           <div class="profile-btn" data-patch="ptdeep"><span class="profile-name">Pt Deep</span><span class="profile-desc">Pentax K10D</span></div>
           <div class="profile-btn" data-patch="czuiko"><span class="profile-name">C Zuiko</span><span class="profile-desc">Olympus C-5050</span></div>
           <div class="profile-btn" data-patch="kmemory"><span class="profile-name">K Memory</span><span class="profile-desc">Kodak P880</span></div>
           <div class="profile-btn" data-patch="hdream"><span class="profile-name">H Dream</span><span class="profile-desc">Holga 120N</span></div>
+          <div class="profile-btn" data-patch="dwarm"><span class="profile-name">D Warm</span><span class="profile-desc">Nikon D70</span></div>
+          <div class="profile-btn" data-patch="psonar"><span class="profile-name">P Sonar</span><span class="profile-desc">Polaroid SX-70</span></div>
         </div>
       </div>
 
