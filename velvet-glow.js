@@ -1,0 +1,369 @@
+// ── Velvet Glow エフェクトエンジン（k-eis DESIGN FILTER 00-α・個人用/非公開）
+// 「ライカの風合い」のリサーチをもとに、客観的な裏付けのある部分を軸に翻訳した5パラメータ:
+// 01 CCD COLOR      → コダックCCD世代の、フィルムのような色の転び（特に赤を深く）
+// 02 APO SHARPNESS  → ローパスレス設計を思わせる、緻密な解像感
+// 03 MICRO CONTRAST → いわゆる「3Dポップ」。中間トーンの局所コントラストで被写体を浮かせる
+// 04 GLOW           → 明るいレンズ開放付近とされる「Leica glow」。賛否があるためデフォルトは控えめ
+// 05 TONE ROLLOFF   → ハイライト/シャドウが粘る、穏やかなトーンカーブ
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const outputCanvas = document.getElementById('outputCanvas');
+const canvasBadge = document.getElementById('canvasBadge');
+const ctx = outputCanvas.getContext('2d');
+
+const ccdColorSlider = document.getElementById('ccdColor');
+const apoSharpSlider = document.getElementById('apoSharp');
+const microContrastSlider = document.getElementById('microContrast');
+const glowSlider = document.getElementById('glow');
+const toneRolloffSlider = document.getElementById('toneRolloff');
+const monochromeCheckbox = document.getElementById('monochrome');
+
+const ccdColorVal = document.getElementById('ccdColorVal');
+const apoSharpVal = document.getElementById('apoSharpVal');
+const microContrastVal = document.getElementById('microContrastVal');
+const glowVal = document.getElementById('glowVal');
+const toneRolloffVal = document.getElementById('toneRolloffVal');
+
+const downloadBtn = document.getElementById('downloadBtn');
+const resetBtn = document.getElementById('resetBtn');
+const themeBtns = document.querySelectorAll('.theme-btn');
+
+let originalImage = null;
+let originalImageData = null;
+let previewImageData = null;
+let isDragging = false;
+
+// ── ファイル読み込み
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
+fileInput.addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      setupCanvas(img);
+      applyVelvetGlow();
+      dropZone.style.display = 'none';
+      canvasBadge.style.display = 'block';
+      outputCanvas.style.display = 'block';
+      downloadBtn.disabled = false;
+      resetBtn.disabled = false;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setupCanvas(img) {
+  const MAX_W = 900;
+  let w = img.width, h = img.height;
+  if (w > MAX_W) { h = h * (MAX_W / w); w = MAX_W; }
+  outputCanvas.width = w;
+  outputCanvas.height = h;
+  ctx.drawImage(img, 0, 0, w, h);
+  originalImageData = ctx.getImageData(0, 0, w, h);
+
+  const PREVIEW_MAX_W = 320;
+  const pScale = Math.min(1, PREVIEW_MAX_W / w);
+  const pw = Math.max(1, Math.round(w * pScale));
+  const ph = Math.max(1, Math.round(h * pScale));
+  const pCanvas = document.createElement('canvas');
+  pCanvas.width = pw; pCanvas.height = ph;
+  const pCtx = pCanvas.getContext('2d');
+  pCtx.drawImage(img, 0, 0, pw, ph);
+  previewImageData = pCtx.getImageData(0, 0, pw, ph);
+}
+
+let driftRAF = null;
+function requestApply() {
+  if (driftRAF) cancelAnimationFrame(driftRAF);
+  driftRAF = requestAnimationFrame(() => {
+    driftRAF = null;
+    if (isDragging) {
+      applyVelvetGlow(true);
+    } else {
+      const oldText = canvasBadge.textContent;
+      canvasBadge.textContent = '処理中… PROCESSING';
+      canvasBadge.style.display = 'block';
+      setTimeout(() => {
+        applyVelvetGlow(false);
+        canvasBadge.textContent = 'PREVIEW';
+      }, 10);
+    }
+  });
+}
+
+// ── スライディングウィンドウのボックスブラー（半径によらず高速）
+function boxBlur(data, w, h, radius) {
+  if (radius < 1) return data.slice();
+  const r = Math.max(1, Math.round(radius));
+  const temp = new Float32Array(data.length);
+  const out = new Uint8ClampedArray(data.length);
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 4;
+    let sr=0, sg=0, sb=0, sa=0;
+    for (let k = -r; k <= r; k++) {
+      const sx = k < 0 ? 0 : (k >= w ? w - 1 : k);
+      const i = row + sx*4;
+      sr += data[i]; sg += data[i+1]; sb += data[i+2]; sa += data[i+3];
+    }
+    const count = 2*r + 1;
+    temp[row] = sr/count; temp[row+1] = sg/count; temp[row+2] = sb/count; temp[row+3] = sa/count;
+    for (let x = 1; x < w; x++) {
+      const addX = (x+r) >= w ? w-1 : x+r;
+      const remX = (x-1-r) < 0 ? 0 : x-1-r;
+      const ai = row + addX*4, ri = row + remX*4;
+      sr += data[ai] - data[ri]; sg += data[ai+1] - data[ri+1]; sb += data[ai+2] - data[ri+2]; sa += data[ai+3] - data[ri+3];
+      const oi = row + x*4;
+      temp[oi] = sr/count; temp[oi+1] = sg/count; temp[oi+2] = sb/count; temp[oi+3] = sa/count;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sr=0, sg=0, sb=0, sa=0;
+    for (let k = -r; k <= r; k++) {
+      const sy = k < 0 ? 0 : (k >= h ? h - 1 : k);
+      const i = (sy*w+x)*4;
+      sr += temp[i]; sg += temp[i+1]; sb += temp[i+2]; sa += temp[i+3];
+    }
+    const count = 2*r + 1;
+    let oi = x*4;
+    out[oi] = sr/count; out[oi+1] = sg/count; out[oi+2] = sb/count; out[oi+3] = sa/count;
+    for (let y = 1; y < h; y++) {
+      const addY = (y+r) >= h ? h-1 : y+r;
+      const remY = (y-1-r) < 0 ? 0 : y-1-r;
+      const ai = (addY*w+x)*4, ri = (remY*w+x)*4;
+      sr += temp[ai] - temp[ri]; sg += temp[ai+1] - temp[ri+1]; sb += temp[ai+2] - temp[ri+2]; sa += temp[ai+3] - temp[ri+3];
+      oi = (y*w+x)*4;
+      out[oi] = sr/count; out[oi+1] = sg/count; out[oi+2] = sb/count; out[oi+3] = sa/count;
+    }
+  }
+  return out;
+}
+
+function applyVelvetGlow(preview) {
+  if (!originalImageData) return;
+
+  const useData = (preview && previewImageData) ? previewImageData : originalImageData;
+  const w = useData.width, h = useData.height;
+  const radiusScale = preview ? (w / outputCanvas.width) : 1;
+
+  const ccdColor = parseInt(ccdColorSlider.value) / 100;
+  const apoSharp = parseInt(apoSharpSlider.value) / 100;
+  const microContrast = parseInt(microContrastSlider.value) / 100;
+  const glow = parseInt(glowSlider.value) / 100;
+  const toneRolloff = parseInt(toneRolloffSlider.value) / 100;
+  const mono = monochromeCheckbox.checked;
+
+  const src = useData.data;
+  let out = new Uint8ClampedArray(src.length);
+
+  // ── STEP 1: CCD COLOR + TONE ROLLOFF（1パスの per-pixel 処理）
+  const blackLift = toneRolloff * 14;
+  const kneeStart = 0.78 - toneRolloff * 0.12; // ハイライトの粘りが始まる位置
+
+  for (let i = 0; i < src.length; i += 4) {
+    let r = src[i], g = src[i+1], b = src[i+2];
+    const avg = (r + g + b) / 3;
+
+    // CCD Color：赤を深く鮮やかに、緑・青は控えめに。フィルムのような色の転び
+    r = avg + (r - avg) * (1 + 0.9 * ccdColor);
+    g = avg + (g - avg) * (1 + 0.3 * ccdColor);
+    b = avg + (b - avg) * (1 + 0.15 * ccdColor);
+    r = r * (1 + 0.06 * ccdColor);
+
+    // TONE ROLLOFF：黒を持ち上げ、ハイライトはソフトニーで粘らせる
+    r = blackLift + r * (1 - blackLift/255);
+    g = blackLift + g * (1 - blackLift/255);
+    b = blackLift + b * (1 - blackLift/255);
+    const softKnee = (v) => {
+      const t = v / 255;
+      if (t <= kneeStart) return v;
+      const excess = (t - kneeStart) / (1 - kneeStart);
+      const compressed = kneeStart + (1 - kneeStart) * (1 - Math.pow(1 - excess, 1 + toneRolloff * 2.5));
+      return compressed * 255;
+    };
+    r = softKnee(Math.max(0, Math.min(255, r)));
+    g = softKnee(Math.max(0, Math.min(255, g)));
+    b = softKnee(Math.max(0, Math.min(255, b)));
+
+    out[i] = r; out[i+1] = g; out[i+2] = b; out[i+3] = src[i+3];
+  }
+
+  // ── STEP 2: APO SHARPNESS（アンシャープマスク。緻密だが強調しすぎない）
+  if (apoSharp > 0.01) {
+    const blurred = boxBlur(out, w, h, 1.4 * Math.max(radiusScale, 0.35));
+    const next = new Uint8ClampedArray(out.length);
+    const amount = apoSharp * 1.1;
+    for (let i = 0; i < out.length; i += 4) {
+      next[i]   = out[i]   + (out[i]   - blurred[i])   * amount;
+      next[i+1] = out[i+1] + (out[i+1] - blurred[i+1]) * amount;
+      next[i+2] = out[i+2] + (out[i+2] - blurred[i+2]) * amount;
+      next[i+3] = out[i+3];
+    }
+    out = next;
+  }
+
+  // ── STEP 3: MICRO CONTRAST（中間トーンの局所コントラスト。3Dポップ）
+  if (microContrast > 0.01) {
+    const blurRadius = 10 * Math.max(radiusScale, 0.35);
+    const blurred = boxBlur(out, w, h, blurRadius);
+    const next = new Uint8ClampedArray(out.length);
+    const amount = microContrast * 0.9;
+    for (let i = 0; i < out.length; i += 4) {
+      const lum = out[i]*0.299 + out[i+1]*0.587 + out[i+2]*0.114;
+      const midWeight = 1 - Math.abs(lum - 128) / 128; // 中間トーンほど強く効かせる
+      const w2 = amount * Math.max(0, midWeight);
+      next[i]   = out[i]   + (out[i]   - blurred[i])   * w2;
+      next[i+1] = out[i+1] + (out[i+1] - blurred[i+1]) * w2;
+      next[i+2] = out[i+2] + (out[i+2] - blurred[i+2]) * w2;
+      next[i+3] = out[i+3];
+    }
+    out = next;
+  }
+
+  // ── STEP 4: GLOW（ハイライト抽出→ぼかし→スクリーン合成。賛否ある効果のため控えめ運用）
+  if (glow > 0.01) {
+    const threshold = 195;
+    const highlights = new Uint8ClampedArray(out.length);
+    for (let i = 0; i < out.length; i += 4) {
+      const lum = out[i]*0.299 + out[i+1]*0.587 + out[i+2]*0.114;
+      const amt = Math.max(0, lum - threshold) / (255 - threshold);
+      highlights[i]   = out[i]   * amt;
+      highlights[i+1] = out[i+1] * amt;
+      highlights[i+2] = out[i+2] * amt;
+      highlights[i+3] = 255;
+    }
+    const bloomRadius = 3 + glow * 14 * Math.max(radiusScale, 0.35);
+    const bloomed = boxBlur(highlights, w, h, bloomRadius);
+    const bloomStrength = glow * 0.6;
+    for (let i = 0; i < out.length; i += 4) {
+      out[i]   = 255 - (255 - out[i])   * (1 - (bloomed[i]/255)   * bloomStrength);
+      out[i+1] = 255 - (255 - out[i+1]) * (1 - (bloomed[i+1]/255) * bloomStrength);
+      out[i+2] = 255 - (255 - out[i+2]) * (1 - (bloomed[i+2]/255) * bloomStrength);
+    }
+  }
+
+  if (mono) {
+    for (let i = 0; i < out.length; i += 4) {
+      const gray = out[i]*0.299 + out[i+1]*0.587 + out[i+2]*0.114;
+      out[i] = out[i+1] = out[i+2] = gray;
+    }
+  }
+
+  const resultData = new ImageData(out, w, h);
+
+  if (preview && previewImageData) {
+    let tempCanvas = applyVelvetGlow._tempCanvas;
+    if (!tempCanvas) { tempCanvas = document.createElement('canvas'); applyVelvetGlow._tempCanvas = tempCanvas; }
+    tempCanvas.width = w; tempCanvas.height = h;
+    tempCanvas.getContext('2d').putImageData(resultData, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(tempCanvas, 0, 0, w, h, 0, 0, outputCanvas.width, outputCanvas.height);
+  } else {
+    ctx.putImageData(resultData, 0, 0);
+  }
+}
+
+// ── UIイベント
+const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider];
+allSliders.forEach(slider => {
+  slider.addEventListener('pointerdown', () => { isDragging = true; });
+  slider.addEventListener('touchstart', () => { isDragging = true; }, { passive: true });
+});
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  requestApply();
+}
+allSliders.forEach(slider => {
+  slider.addEventListener('pointerup', endDrag);
+  slider.addEventListener('touchend', endDrag);
+  slider.addEventListener('change', endDrag);
+});
+window.addEventListener('pointerup', () => { if (isDragging) endDrag(); });
+window.addEventListener('touchend', () => { if (isDragging) endDrag(); });
+
+ccdColorSlider.addEventListener('input', () => { ccdColorVal.textContent = ccdColorSlider.value + '%'; requestApply(); });
+apoSharpSlider.addEventListener('input', () => { apoSharpVal.textContent = apoSharpSlider.value + '%'; requestApply(); });
+microContrastSlider.addEventListener('input', () => { microContrastVal.textContent = microContrastSlider.value + '%'; requestApply(); });
+glowSlider.addEventListener('input', () => { glowVal.textContent = glowSlider.value + '%'; requestApply(); });
+toneRolloffSlider.addEventListener('input', () => { toneRolloffVal.textContent = toneRolloffSlider.value + '%'; requestApply(); });
+monochromeCheckbox.addEventListener('change', () => applyVelvetGlow());
+
+// ── テーマ切り替え（Optical Glass / Brass × Leather）
+const THEME_CLASS_MAP = { glass: null, brass: 'theme-brass' };
+function applyTheme(themeKey) {
+  if (!(themeKey in THEME_CLASS_MAP)) return;
+  Object.values(THEME_CLASS_MAP).forEach(cls => { if (cls) document.body.classList.remove(cls); });
+  const cls = THEME_CLASS_MAP[themeKey];
+  if (cls) document.body.classList.add(cls);
+  themeBtns.forEach(b => b.classList.toggle('active', b.dataset.theme === themeKey));
+  try { localStorage.setItem('velvetglow-theme', themeKey); } catch(e) {}
+}
+themeBtns.forEach(btn => btn.addEventListener('click', () => applyTheme(btn.dataset.theme)));
+try {
+  const saved = localStorage.getItem('velvetglow-theme');
+  if (saved && (saved in THEME_CLASS_MAP)) applyTheme(saved);
+} catch(e) {}
+
+// ── 保存（iOS対応：オーバーレイ方式）
+downloadBtn.addEventListener('click', () => {
+  try {
+    const dataUrl = outputCanvas.toDataURL('image/png');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      showSaveOverlay(dataUrl);
+    } else {
+      const link = document.createElement('a');
+      link.download = 'velvet-glow.png';
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  } catch (err) {
+    console.error('PNG保存に失敗しました:', err);
+    alert('画像の保存に失敗しました。ブラウザを再読み込みしてもう一度お試しください。');
+  }
+});
+
+function showSaveOverlay(dataUrl) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `position: fixed; inset: 0; z-index: 9999; background: rgba(10,10,10,0.96);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;`;
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.style.cssText = 'max-width: 100%; max-height: 75vh; border-radius: 2px;';
+  const hint = document.createElement('p');
+  hint.innerHTML = '画像を長押しして「写真に保存」を選んでください<br><span style="color:#888; font-size:11px;">Press and hold the image, then tap "Save to Photos"</span>';
+  hint.style.cssText = 'color: #ccc; font-family: sans-serif; font-size: 13px; margin-top: 16px; text-align: center; line-height: 1.6;';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '閉じる / Close';
+  closeBtn.style.cssText = `margin-top: 20px; padding: 10px 24px; background: transparent; color: white; border: 1px solid #666; border-radius: 2px; font-family: sans-serif; font-size: 13px; cursor: pointer;`;
+  closeBtn.addEventListener('click', () => overlay.remove());
+  overlay.appendChild(img); overlay.appendChild(hint); overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+}
+
+resetBtn.addEventListener('click', () => {
+  originalImage = null;
+  originalImageData = null;
+  outputCanvas.style.display = 'none';
+  canvasBadge.style.display = 'none';
+  dropZone.style.display = 'flex';
+  downloadBtn.disabled = true;
+  resetBtn.disabled = true;
+  fileInput.value = '';
+});

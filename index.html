@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Velvet Glow — k-eis</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  /* Optical Glass：レンズコーティングの反射を思わせる、冷たいブルーグレー */
+  --bg: #1c2226;
+  --ink: #e8edf0;
+  --line: #333d43;
+  --line-strong: #4a5860;
+  --accent: #6fa8c9;
+  --accent2: #8fbfd6;
+  --muted: #7c8a91;
+  --canvas-check-a: #202830;
+  --canvas-check-b: #1c2226;
+  --mono: 'Courier New', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ── THEME: BRASS × BLACK LEATHER（使い込まれたヴィンテージボディ） ── */
+body.theme-brass {
+  --bg: #17140f;
+  --ink: #ece4d0;
+  --line: #3a3226;
+  --line-strong: #5a4c34;
+  --accent: #b8863a;
+  --accent2: #8a6a2e;
+  --muted: #8a7a5c;
+  --canvas-check-a: #1e1a12;
+  --canvas-check-b: #17140f;
+}
+
+html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); min-height: 100vh; transition: background 0.3s, color 0.3s; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 40px 32px 80px; }
+
+header { border-bottom: 1px solid var(--line-strong); padding-bottom: 22px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+.filter-tag { font: 600 10px/1 var(--mono); color: var(--accent); letter-spacing: 0.16em; margin-bottom: 10px; }
+h1 { font: 300 32px/1.1 var(--sans); letter-spacing: -0.01em; }
+h1 .jp { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 10px; }
+.tagline { font: 400 12px/1.6 var(--sans); color: var(--muted); margin-top: 6px; }
+.private-badge { font: 700 9px/1 var(--mono); color: var(--accent); letter-spacing: 0.08em; margin-top: 8px; border: 1px dashed var(--accent); display: inline-block; padding: 3px 7px; }
+.version { font: 400 9px/1 var(--mono); color: var(--muted); letter-spacing: 0.1em; text-align: right; }
+
+/* ── テーマ切り替え ── */
+.theme-switcher { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.theme-label { font: 500 9px/1 var(--mono); color: var(--muted); letter-spacing: 0.1em; white-space: nowrap; }
+.theme-options { display: flex; gap: 6px; flex-wrap: wrap; }
+.theme-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: 500 9.5px/1 var(--sans); cursor: pointer; transition: all 0.12s; }
+.theme-btn:hover { border-color: var(--accent); }
+.theme-btn.active { background: var(--accent); border-color: var(--accent); color: #14181a; }
+.theme-btn .swatch { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+/* ── メインレイアウト ── */
+.stage { display: grid; grid-template-columns: 1fr 300px; gap: 0; border: 1px solid var(--line-strong); }
+
+.canvas-area {
+  position: relative;
+  background:
+    linear-gradient(45deg, var(--canvas-check-a) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--canvas-check-a) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--canvas-check-a) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--canvas-check-a) 75%);
+  background-color: var(--canvas-check-b);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  border-right: 1px solid var(--line-strong);
+  min-height: 480px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+
+#dropZone { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: pointer; transition: background 0.15s; }
+#dropZone.drag-over { background: rgba(111,168,201,0.08); }
+#dropZone .icon { width: 40px; height: 40px; border: 1.5px solid var(--line-strong); border-radius: 50%; position: relative; }
+#dropZone .icon::before { content:''; position:absolute; left:50%; top:50%; width:14px; height:14px; border-radius:50%; background: var(--line-strong); transform: translate(-50%,-50%); opacity:0.5; }
+#dropZone .label-main { font: 500 12px/1 var(--sans); color: var(--ink); text-align: center; }
+#dropZone .label-sub { font: 400 9px/1 var(--mono); color: var(--muted); letter-spacing: 0.08em; }
+#fileInput { display: none; }
+
+canvas#outputCanvas { max-width: 100%; max-height: 640px; display: none; }
+.canvas-badge { position: absolute; top: 14px; left: 14px; font: 500 9px/1 var(--mono); color: var(--ink); background: rgba(0,0,0,0.4); padding: 4px 8px; border: 1px solid var(--line); letter-spacing: 0.08em; display: none; }
+
+/* ── コントロールパネル ── */
+.controls { background: var(--bg); padding: 22px 20px; display: flex; flex-direction: column; gap: 0; }
+.ctrl-group { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.ctrl-group:first-child { padding-top: 0; }
+.ctrl-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.ctrl-label .name { font: 500 10px/1 var(--sans); color: var(--ink); letter-spacing: 0.02em; }
+.ctrl-label .name .jp-small { font-size: 9px; color: var(--muted); margin-left: 4px; }
+.ctrl-label .val { font: 500 10px/1 var(--mono); color: var(--accent); }
+
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--line-strong); outline: none; cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; transition: transform 0.1s; }
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; }
+
+.checkbox-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.checkbox-row label { font: 500 10px/1 var(--sans); color: var(--ink); cursor: pointer; }
+.checkbox-row input { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+
+.action-buttons { display: flex; gap: 8px; }
+.btn { flex: 1; padding: 12px; border: 1px solid var(--accent); background: var(--accent); color: #14181a; font: 600 11px/1 var(--sans); letter-spacing: 0.04em; cursor: pointer; }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn.secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+
+.footer-links { display: flex; gap: 8px; margin-top: 16px; }
+.footer-links a { flex: 1; padding: 11px 14px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); font: 500 10px/1 var(--sans); letter-spacing: 0.03em; text-align: center; text-decoration: none; cursor: pointer; }
+.footer-links a:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 860px) {
+  .wrap { padding: 20px 16px 50px; }
+  header { flex-direction: column; align-items: flex-start; gap: 10px; padding-bottom: 16px; margin-bottom: 20px; }
+  h1 { font-size: 24px; }
+  h1 .jp { display: block; margin-left: 0; margin-top: 4px; }
+  .stage { grid-template-columns: 1fr; border: none; }
+  .canvas-area { border: 1px solid var(--line-strong); border-bottom: none; min-height: 220px; }
+  .controls { border: 1px solid var(--line-strong); border-top: none; padding: 18px 16px; }
+  input[type="range"] { height: 4px; margin: 8px 0; }
+  input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+  input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+  .btn { padding: 16px; font-size: 12px; }
+  .footer-links { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="filter-tag">k-eis DESIGN FILTER 00-α</div>
+      <h1>Velvet Glow <span class="jp">ビロードのにじみ</span></h1>
+      <div class="tagline">The Leica look, translated — deep color, quiet sharpness, a debated glow.</div>
+      <div class="tagline" style="margin-top:2px; opacity:0.85;">ライカの風合いを翻訳する——深い色、静かな解像感、賛否あるにじみ。</div>
+      <div class="private-badge">PERSONAL / UNLISTED</div>
+    </div>
+    <div class="version">© 2026 k-eis studio</div>
+  </header>
+
+  <div class="theme-switcher">
+    <span class="theme-label">BODY FINISH <span class="jp-small">着せ替え</span></span>
+    <div class="theme-options">
+      <button class="theme-btn active" data-theme="glass">
+        <span class="swatch" style="background:#1c2226; border:1px solid #6fa8c9;"></span>
+        Optical Glass
+      </button>
+      <button class="theme-btn" data-theme="brass">
+        <span class="swatch" style="background:#17140f; border:1px solid #b8863a;"></span>
+        Brass × Leather
+      </button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-area">
+      <div id="dropZone">
+        <div class="icon"></div>
+        <div class="label-main">Drop image, or click to select<br><span style="font-size:10px; opacity:0.6;">画像をドロップ、またはクリックして選択</span></div>
+        <div class="label-sub">PNG / JPEG SUPPORTED</div>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+      <div class="canvas-badge" id="canvasBadge">PREVIEW</div>
+      <canvas id="outputCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">CCD COLOR <span class="jp-small">色再現</span></span>
+          <span class="val" id="ccdColorVal">40%</span>
+        </div>
+        <input type="range" id="ccdColor" min="0" max="100" value="40">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">APO SHARPNESS <span class="jp-small">解像感</span></span>
+          <span class="val" id="apoSharpVal">35%</span>
+        </div>
+        <input type="range" id="apoSharp" min="0" max="100" value="35">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">MICRO CONTRAST <span class="jp-small">3Dポップ</span></span>
+          <span class="val" id="microContrastVal">30%</span>
+        </div>
+        <input type="range" id="microContrast" min="0" max="100" value="30">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">GLOW <span class="jp-small">にじみ（賛否あり）</span></span>
+          <span class="val" id="glowVal">15%</span>
+        </div>
+        <input type="range" id="glow" min="0" max="100" value="15">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">TONE ROLLOFF <span class="jp-small">階調の粘り</span></span>
+          <span class="val" id="toneRolloffVal">30%</span>
+        </div>
+        <input type="range" id="toneRolloff" min="0" max="100" value="30">
+      </div>
+
+      <div class="ctrl-group">
+        <div class="checkbox-row">
+          <input type="checkbox" id="monochrome">
+          <label for="monochrome">MONOCHROME <span style="opacity:0.6;font-weight:400;">/ Mモノクローム風</span></label>
+        </div>
+      </div>
+
+      <div class="ctrl-group" style="border-bottom:none;">
+        <div class="action-buttons">
+          <button class="btn" id="downloadBtn" disabled>SAVE AS PNG</button>
+          <button class="btn secondary" id="resetBtn" disabled>RESET IMAGE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-links">
+    <a href="https://keis01.substack.com/p/k-eis-design-filter-000" target="_blank" rel="noopener">PHILOSOPHY • USAGE • LICENSE</a>
+    <a href="https://keis01.substack.com/s/k-eis-design-filter" target="_blank" rel="noopener">ALL FILTERS</a>
+  </div>
+</div>
+
+<script src="velvet-glow.js"></script>
+</body>
+</html>
