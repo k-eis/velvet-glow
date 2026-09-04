@@ -474,6 +474,12 @@ const CAMERA_PATCHES = {
   hdream:    { ccdColor:20, apoSharp:0,  microContrast:5,  glow:20, toneRolloff:60, crush:0,  grain:35, colorTemp:58, saturation:35, vignette:70, softFocus:55, lightLeak:60, mono:false }, // Holga 120N：低コントラストが本質なのでCRUSHは使わない
   dwarm:     { ccdColor:45, apoSharp:30, microContrast:35, glow:5,  toneRolloff:15, crush:15, grain:15, colorTemp:62, saturation:55, vignette:5,  softFocus:0,  lightLeak:0,  mono:false }, // Nikon D70：暖色の「ニコンカラー」＋パンチのあるコントラスト
   psonar:    { ccdColor:15, apoSharp:0,  microContrast:5,  glow:15, toneRolloff:55, crush:0,  grain:15, colorTemp:65, saturation:30, vignette:45, softFocus:35, lightLeak:0,  mono:false }, // Polaroid SX-70：パステルな低彩度、Holgaとは違う穏やかな柔らかさ（光漏れは使わない）
+  cnega:     { ccdColor:30, apoSharp:15, microContrast:15, glow:10, toneRolloff:45, crush:0,  grain:10, colorTemp:55, saturation:40, vignette:5,  softFocus:10, lightLeak:0,  mono:false }, // Canon EOS 5D：アンダー気味で色のりが良い、しっとりしたフィルム的な階調
+  swivel707: { ccdColor:25, apoSharp:20, microContrast:10, glow:15, toneRolloff:30, crush:0,  grain:25, colorTemp:45, saturation:40, vignette:10, softFocus:5,  lightLeak:0,  mono:false }, // Sony DSC-F707：Y2Kデジカメの柔らかさ＋ツァイスレンズ
+  zsonnar:   { ccdColor:20, apoSharp:45, microContrast:30, glow:5,  toneRolloff:20, crush:5,  grain:5,  colorTemp:48, saturation:45, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sony DSC-R1：大判CMOS×ツァイスの、空気感まで写す解像感
+  k14n:      { ccdColor:75, apoSharp:25, microContrast:25, glow:10, toneRolloff:15, crush:20, grain:25, colorTemp:68, saturation:65, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Kodak DCS Pro 14n：K Memoryよりさらに極端で大胆なKodak発色
+  p67film:   { ccdColor:25, apoSharp:10, microContrast:10, glow:15, toneRolloff:55, crush:0,  grain:30, colorTemp:55, saturation:35, vignette:25, softFocus:15, lightLeak:0,  mono:false }, // PENTAX 6x7：中判フィルムらしい柔らかく粒状感のある階調
+  rd1retro:  { ccdColor:40, apoSharp:30, microContrast:25, glow:15, toneRolloff:25, crush:10, grain:20, colorTemp:45, saturation:45, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Epson R-D1：ライカMマウント×CCDの飾らない実直な発色
 };
 
 function setSlider(slider, valEl, value, formatter) {
