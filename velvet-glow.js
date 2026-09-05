@@ -224,11 +224,11 @@ function applyVelvetGlow(preview) {
     let r = src[i], g = src[i+1], b = src[i+2];
     const avg = (r + g + b) / 3;
 
-    // CCD Color：赤を深く鮮やかに、緑・青は控えめに。フィルムのような色の転び
-    r = avg + (r - avg) * (1 + 0.9 * ccdColor);
-    g = avg + (g - avg) * (1 + 0.3 * ccdColor);
-    b = avg + (b - avg) * (1 + 0.15 * ccdColor);
-    r = r * (1 + 0.06 * ccdColor);
+    // CCD Color：赤を深く鮮やかに、緑・青は控えめに。フィルムのような色の転び（静かな濃さを意識して控えめに）
+    r = avg + (r - avg) * (1 + 0.55 * ccdColor);
+    g = avg + (g - avg) * (1 + 0.2 * ccdColor);
+    b = avg + (b - avg) * (1 + 0.1 * ccdColor);
+    r = r * (1 + 0.04 * ccdColor);
 
     // TONE ROLLOFF：黒を持ち上げ、ハイライトはソフトニーで粘らせる
     r = blackLift + r * (1 - blackLift/255);
@@ -334,7 +334,7 @@ function applyVelvetGlow(preview) {
       else { b += -colorTemp*22; r += colorTemp*14; }
       // SATURATION：平均輝度からの距離を伸縮
       const avg = (r+g+b)/3;
-      const satMul = 1 + saturation*0.7;
+      const satMul = 1 + saturation*0.5;
       r = avg + (r-avg)*satMul; g = avg + (g-avg)*satMul; b = avg + (b-avg)*satMul;
       out[i] = Math.max(0,Math.min(255,r)); out[i+1] = Math.max(0,Math.min(255,g)); out[i+2] = Math.max(0,Math.min(255,b));
     }
@@ -487,7 +487,7 @@ try {
 // sat/tempは50が中間（スライダーの生値）。それ以外は0-100のスライダー生値。
 const CAMERA_PATCHES = {
   init:      { ccdColor:0,  apoSharp:0,  microContrast:0,  glow:0,  toneRolloff:0,  crush:0,  grain:0,  colorTemp:50, saturation:50, vignette:0,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // 初期化
-  lvelvet:   { ccdColor:55, apoSharp:25, microContrast:35, glow:45, toneRolloff:35, crush:10, grain:0,  colorTemp:42, saturation:55, vignette:20, fieldBlur:0,  softFocus:10, lightLeak:0,  mono:false }, // Leica M8：色の深みと夜の空気感が本質。粒状感は特徴として強くないので0
+  lvelvet:   { ccdColor:35, apoSharp:25, microContrast:35, glow:45, toneRolloff:35, crush:10, grain:0,  colorTemp:42, saturation:38, vignette:20, fieldBlur:0,  softFocus:10, lightLeak:0,  mono:false }, // Leica M8：静かで抑制の効いた濃さを意識し彩度・色を控えめに調整
   fvelvet:   { ccdColor:30, apoSharp:20, microContrast:15, glow:20, toneRolloff:60, crush:0,  grain:0,  colorTemp:60, saturation:45, vignette:5,  fieldBlur:0,  softFocus:15, lightLeak:0,  mono:false }, // Fuji S5 Pro：白飛びしにくさが本質なのでCRUSHは使わない
   spresence: { ccdColor:40, apoSharp:70, microContrast:80, glow:0,  toneRolloff:5,  crush:15, grain:0,  colorTemp:50, saturation:65, vignette:0,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sigma DP2 Merrill：Foveonは低ノイズが持ち味なので粒状感は0
   rsharp:    { ccdColor:25, apoSharp:65, microContrast:60, glow:5,  toneRolloff:0,  crush:55, grain:25, colorTemp:50, saturation:30, vignette:15, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:true  }, // Ricoh GR Digital：粒状感はGRの数少ない"本当に必要な"個性
@@ -504,8 +504,8 @@ const CAMERA_PATCHES = {
   zsonnar:   { ccdColor:20, apoSharp:45, microContrast:30, glow:5,  toneRolloff:20, crush:5,  grain:0,  colorTemp:48, saturation:45, vignette:0,  fieldBlur:20, softFocus:0,  lightLeak:0,  mono:false }, // Sony DSC-R1：大判CMOS×ツァイスの、空気感まで写す解像感。像面の滑らかさにFIELD BLURを軽く
   k14n:      { ccdColor:75, apoSharp:25, microContrast:25, glow:10, toneRolloff:15, crush:20, grain:25, colorTemp:68, saturation:65, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Kodak DCS Pro 14n：ノイズ・粒状感は賛否ある本物の個性なので維持
   p67film:   { ccdColor:25, apoSharp:10, microContrast:10, glow:15, toneRolloff:55, crush:0,  grain:20, colorTemp:55, saturation:35, vignette:25, fieldBlur:0,  softFocus:15, lightLeak:0,  mono:false }, // PENTAX 6x7：中判フィルムの粒状感は本質的な特徴なので維持
-  rd1retro:  { ccdColor:40, apoSharp:30, microContrast:25, glow:15, toneRolloff:25, crush:10, grain:0,  colorTemp:45, saturation:45, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Epson R-D1：ライカMマウント×CCDの飾らない実直な発色
-  g2zeiss:   { ccdColor:25, apoSharp:35, microContrast:20, glow:10, toneRolloff:30, crush:5,  grain:0,  colorTemp:50, saturation:45, vignette:10, fieldBlur:35, softFocus:0,  lightLeak:0,  mono:false }, // Contax G2：Planar/Biogonの、中心から周辺への滑らかな像面湾曲をFIELD BLURで再現
+  rd1retro:  { ccdColor:28, apoSharp:30, microContrast:25, glow:15, toneRolloff:25, crush:10, grain:0,  colorTemp:45, saturation:36, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Epson R-D1：飾らない実直な発色。静かさを意識し彩度控えめに調整
+  g2zeiss:   { ccdColor:20, apoSharp:35, microContrast:20, glow:10, toneRolloff:30, crush:5,  grain:0,  colorTemp:50, saturation:38, vignette:10, fieldBlur:35, softFocus:0,  lightLeak:0,  mono:false }, // Contax G2：静かさを意識し彩度控えめに調整。像面湾曲はFIELD BLURで再現
   nrare:     { ccdColor:55, apoSharp:25, microContrast:20, glow:10, toneRolloff:20, crush:15, grain:0,  colorTemp:40, saturation:55, vignette:15, fieldBlur:15, softFocus:0,  lightLeak:0,  mono:false }, // Contax N Digital：世界初フルサイズCCD一眼の、独特の色転びと希少機らしい癖
 };
 
