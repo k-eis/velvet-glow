@@ -22,6 +22,7 @@ const grainSlider = document.getElementById('grain');
 const colorTempSlider = document.getElementById('colorTemp');
 const saturationSlider = document.getElementById('saturation');
 const vignetteSlider = document.getElementById('vignette');
+const fieldBlurSlider = document.getElementById('fieldBlur');
 const softFocusSlider = document.getElementById('softFocus');
 const lightLeakSlider = document.getElementById('lightLeak');
 const monochromeCheckbox = document.getElementById('monochrome');
@@ -36,6 +37,7 @@ const grainVal = document.getElementById('grainVal');
 const colorTempVal = document.getElementById('colorTempVal');
 const saturationVal = document.getElementById('saturationVal');
 const vignetteVal = document.getElementById('vignetteVal');
+const fieldBlurVal = document.getElementById('fieldBlurVal');
 const softFocusVal = document.getElementById('softFocusVal');
 const lightLeakVal = document.getElementById('lightLeakVal');
 
@@ -203,6 +205,7 @@ function applyVelvetGlow(preview) {
   const colorTemp = (parseInt(colorTempSlider.value) - 50) / 50; // -1(寒色)〜0(中間)〜+1(暖色)
   const saturation = (parseInt(saturationSlider.value) - 50) / 50; // -1(彩度低)〜0〜+1(彩度高)
   const vignette = parseInt(vignetteSlider.value) / 100;
+  const fieldBlur = parseInt(fieldBlurSlider.value) / 100;
   const softFocus = parseInt(softFocusSlider.value) / 100;
   const lightLeak = parseInt(lightLeakSlider.value) / 100;
   const mono = monochromeCheckbox.checked;
@@ -364,6 +367,23 @@ function applyVelvetGlow(preview) {
     }
   }
 
+  // ── STEP 8.5: FIELD BLUR（像面の滲み。ツァイス系レンズの、中心から周辺への滑らかな像面湾曲）
+  //    VIGNETTE（暗くする）とは別軸——「暗くする」のではなく「ぼかす」ことでレンズの光学的な奥行きを再現する
+  if (fieldBlur > 0.01) {
+    const blurred = boxBlur(out, w, h, (2 + fieldBlur * 10) * Math.max(radiusScale, 0.35));
+    const cx = w/2, cy = h/2, maxDist = Math.sqrt(cx*cx+cy*cy);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = Math.sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy)) / maxDist;
+        const blend = Math.max(0, Math.min(1, (d - 0.25) * fieldBlur * 1.3));
+        const i = (y*w+x)*4;
+        out[i]   = out[i]   * (1-blend) + blurred[i]   * blend;
+        out[i+1] = out[i+1] * (1-blend) + blurred[i+1] * blend;
+        out[i+2] = out[i+2] * (1-blend) + blurred[i+2] * blend;
+      }
+    }
+  }
+
   // ── STEP 9: LIGHT LEAK（角からの暖色フレア。主にHolga向け）
   if (lightLeak > 0.01) {
     const cx = w * 0.85, cy = h * 0.1, maxDist = Math.sqrt(w*w+h*h) * 0.6;
@@ -401,7 +421,7 @@ function applyVelvetGlow(preview) {
 }
 
 // ── UIイベント
-const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider, crushSlider, grainSlider, colorTempSlider, saturationSlider, vignetteSlider, softFocusSlider, lightLeakSlider];
+const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider, crushSlider, grainSlider, colorTempSlider, saturationSlider, vignetteSlider, fieldBlurSlider, softFocusSlider, lightLeakSlider];
 allSliders.forEach(slider => {
   slider.addEventListener('pointerdown', () => { isDragging = true; });
   slider.addEventListener('touchstart', () => { isDragging = true; }, { passive: true });
@@ -437,12 +457,13 @@ saturationSlider.addEventListener('input', () => {
   requestApply();
 });
 vignetteSlider.addEventListener('input', () => { vignetteVal.textContent = vignetteSlider.value + '%'; requestApply(); });
+fieldBlurSlider.addEventListener('input', () => { fieldBlurVal.textContent = fieldBlurSlider.value + '%'; requestApply(); });
 softFocusSlider.addEventListener('input', () => { softFocusVal.textContent = softFocusSlider.value + '%'; requestApply(); });
 lightLeakSlider.addEventListener('input', () => { lightLeakVal.textContent = lightLeakSlider.value + '%'; requestApply(); });
 monochromeCheckbox.addEventListener('change', () => applyVelvetGlow());
 
 // ── テーマ切り替え（Optical Glass / Brass × Leather）
-const THEME_CLASS_MAP = { glass: null, brass: 'theme-brass' };
+const THEME_CLASS_MAP = { glass: null, nordic: 'theme-nordic' };
 function applyTheme(themeKey) {
   if (!(themeKey in THEME_CLASS_MAP)) return;
   Object.values(THEME_CLASS_MAP).forEach(cls => { if (cls) document.body.classList.remove(cls); });
@@ -461,25 +482,27 @@ try {
 // ── CAMERA PATCH：10台のカメラの個性＋初期化
 // sat/tempは50が中間（スライダーの生値）。それ以外は0-100のスライダー生値。
 const CAMERA_PATCHES = {
-  init:      { ccdColor:0,  apoSharp:0,  microContrast:0,  glow:0,  toneRolloff:0,  crush:0,  grain:0,  colorTemp:50, saturation:50, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // 初期化
-  lvelvet:   { ccdColor:55, apoSharp:25, microContrast:35, glow:45, toneRolloff:35, crush:10, grain:30, colorTemp:42, saturation:55, vignette:20, softFocus:10, lightLeak:0,  mono:false }, // Leica M8：夜の空気感に軽い締まりを追加
-  fvelvet:   { ccdColor:30, apoSharp:20, microContrast:15, glow:20, toneRolloff:60, crush:0,  grain:15, colorTemp:60, saturation:45, vignette:5,  softFocus:15, lightLeak:0,  mono:false }, // Fuji S5 Pro：白飛びしにくさが本質なのでCRUSHは使わない
-  spresence: { ccdColor:40, apoSharp:70, microContrast:80, glow:0,  toneRolloff:5,  crush:15, grain:5,  colorTemp:50, saturation:65, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sigma DP2 Merrill：存在感を後押しする軽い締まり
-  rsharp:    { ccdColor:25, apoSharp:65, microContrast:60, glow:5,  toneRolloff:0,  crush:55, grain:35, colorTemp:50, saturation:30, vignette:15, softFocus:0,  lightLeak:0,  mono:true  }, // Ricoh GR Digital：CRUSHでGR特有の硬い白黒を再現
-  gchrome:   { ccdColor:15, apoSharp:15, microContrast:10, glow:10, toneRolloff:35, crush:0,  grain:25, colorTemp:32, saturation:30, vignette:10, softFocus:5,  lightLeak:0,  mono:false }, // Canon G3
-  xfilm:     { ccdColor:35, apoSharp:30, microContrast:20, glow:25, toneRolloff:40, crush:0,  grain:10, colorTemp:58, saturation:50, vignette:5,  softFocus:0,  lightLeak:0,  mono:false }, // Fuji X100
-  ptdeep:    { ccdColor:35, apoSharp:35, microContrast:50, glow:5,  toneRolloff:0,  crush:30, grain:20, colorTemp:38, saturation:55, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Pentax K10D：深い黒はCRUSHが本来の役割
-  czuiko:    { ccdColor:20, apoSharp:25, microContrast:20, glow:10, toneRolloff:20, crush:0,  grain:15, colorTemp:35, saturation:45, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Olympus C-5050
-  kmemory:   { ccdColor:60, apoSharp:20, microContrast:20, glow:15, toneRolloff:30, crush:0,  grain:20, colorTemp:70, saturation:55, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Kodak P880
-  hdream:    { ccdColor:20, apoSharp:0,  microContrast:5,  glow:20, toneRolloff:60, crush:0,  grain:35, colorTemp:58, saturation:35, vignette:70, softFocus:55, lightLeak:60, mono:false }, // Holga 120N：低コントラストが本質なのでCRUSHは使わない
-  dwarm:     { ccdColor:45, apoSharp:30, microContrast:35, glow:5,  toneRolloff:15, crush:15, grain:15, colorTemp:62, saturation:55, vignette:5,  softFocus:0,  lightLeak:0,  mono:false }, // Nikon D70：暖色の「ニコンカラー」＋パンチのあるコントラスト
-  psonar:    { ccdColor:15, apoSharp:0,  microContrast:5,  glow:15, toneRolloff:55, crush:0,  grain:15, colorTemp:65, saturation:30, vignette:45, softFocus:35, lightLeak:0,  mono:false }, // Polaroid SX-70：パステルな低彩度、Holgaとは違う穏やかな柔らかさ（光漏れは使わない）
-  cnega:     { ccdColor:30, apoSharp:15, microContrast:15, glow:10, toneRolloff:45, crush:0,  grain:10, colorTemp:55, saturation:40, vignette:5,  softFocus:10, lightLeak:0,  mono:false }, // Canon EOS 5D：アンダー気味で色のりが良い、しっとりしたフィルム的な階調
-  swivel707: { ccdColor:25, apoSharp:20, microContrast:10, glow:15, toneRolloff:30, crush:0,  grain:25, colorTemp:45, saturation:40, vignette:10, softFocus:5,  lightLeak:0,  mono:false }, // Sony DSC-F707：Y2Kデジカメの柔らかさ＋ツァイスレンズ
-  zsonnar:   { ccdColor:20, apoSharp:45, microContrast:30, glow:5,  toneRolloff:20, crush:5,  grain:5,  colorTemp:48, saturation:45, vignette:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sony DSC-R1：大判CMOS×ツァイスの、空気感まで写す解像感
-  k14n:      { ccdColor:75, apoSharp:25, microContrast:25, glow:10, toneRolloff:15, crush:20, grain:25, colorTemp:68, saturation:65, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Kodak DCS Pro 14n：K Memoryよりさらに極端で大胆なKodak発色
-  p67film:   { ccdColor:25, apoSharp:10, microContrast:10, glow:15, toneRolloff:55, crush:0,  grain:30, colorTemp:55, saturation:35, vignette:25, softFocus:15, lightLeak:0,  mono:false }, // PENTAX 6x7：中判フィルムらしい柔らかく粒状感のある階調
-  rd1retro:  { ccdColor:40, apoSharp:30, microContrast:25, glow:15, toneRolloff:25, crush:10, grain:20, colorTemp:45, saturation:45, vignette:10, softFocus:0,  lightLeak:0,  mono:false }, // Epson R-D1：ライカMマウント×CCDの飾らない実直な発色
+  init:      { ccdColor:0,  apoSharp:0,  microContrast:0,  glow:0,  toneRolloff:0,  crush:0,  grain:0,  colorTemp:50, saturation:50, vignette:0,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // 初期化
+  lvelvet:   { ccdColor:55, apoSharp:25, microContrast:35, glow:45, toneRolloff:35, crush:10, grain:0,  colorTemp:42, saturation:55, vignette:20, fieldBlur:0,  softFocus:10, lightLeak:0,  mono:false }, // Leica M8：色の深みと夜の空気感が本質。粒状感は特徴として強くないので0
+  fvelvet:   { ccdColor:30, apoSharp:20, microContrast:15, glow:20, toneRolloff:60, crush:0,  grain:0,  colorTemp:60, saturation:45, vignette:5,  fieldBlur:0,  softFocus:15, lightLeak:0,  mono:false }, // Fuji S5 Pro：白飛びしにくさが本質なのでCRUSHは使わない
+  spresence: { ccdColor:40, apoSharp:70, microContrast:80, glow:0,  toneRolloff:5,  crush:15, grain:0,  colorTemp:50, saturation:65, vignette:0,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Sigma DP2 Merrill：Foveonは低ノイズが持ち味なので粒状感は0
+  rsharp:    { ccdColor:25, apoSharp:65, microContrast:60, glow:5,  toneRolloff:0,  crush:55, grain:25, colorTemp:50, saturation:30, vignette:15, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:true  }, // Ricoh GR Digital：粒状感はGRの数少ない"本当に必要な"個性
+  gchrome:   { ccdColor:15, apoSharp:15, microContrast:10, glow:10, toneRolloff:35, crush:0,  grain:0,  colorTemp:32, saturation:30, vignette:10, fieldBlur:0,  softFocus:5,  lightLeak:0,  mono:false }, // Canon G3
+  xfilm:     { ccdColor:35, apoSharp:30, microContrast:20, glow:25, toneRolloff:40, crush:0,  grain:0,  colorTemp:58, saturation:50, vignette:5,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Fuji X100
+  ptdeep:    { ccdColor:35, apoSharp:35, microContrast:50, glow:5,  toneRolloff:0,  crush:30, grain:0,  colorTemp:38, saturation:55, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Pentax K10D：深い黒はCRUSHが本来の役割
+  czuiko:    { ccdColor:20, apoSharp:25, microContrast:20, glow:10, toneRolloff:20, crush:0,  grain:0,  colorTemp:35, saturation:45, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Olympus C-5050
+  kmemory:   { ccdColor:60, apoSharp:20, microContrast:20, glow:15, toneRolloff:30, crush:0,  grain:0,  colorTemp:70, saturation:55, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Kodak P880
+  hdream:    { ccdColor:20, apoSharp:0,  microContrast:5,  glow:20, toneRolloff:60, crush:0,  grain:30, colorTemp:58, saturation:35, vignette:70, fieldBlur:0,  softFocus:55, lightLeak:60, mono:false }, // Holga 120N：フィルム粒子は本質的な特徴なので維持
+  dwarm:     { ccdColor:45, apoSharp:30, microContrast:35, glow:5,  toneRolloff:15, crush:15, grain:0,  colorTemp:62, saturation:55, vignette:5,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Nikon D70：暖色の「ニコンカラー」＋パンチのあるコントラスト
+  psonar:    { ccdColor:15, apoSharp:0,  microContrast:5,  glow:15, toneRolloff:55, crush:0,  grain:0,  colorTemp:65, saturation:30, vignette:45, fieldBlur:0,  softFocus:35, lightLeak:0,  mono:false }, // Polaroid SX-70：パステルな低彩度、Holgaとは違う穏やかな柔らかさ（光漏れは使わない）
+  cnega:     { ccdColor:30, apoSharp:15, microContrast:15, glow:10, toneRolloff:45, crush:0,  grain:0,  colorTemp:55, saturation:40, vignette:5,  fieldBlur:0,  softFocus:10, lightLeak:0,  mono:false }, // Canon EOS 5D：アンダー気味で色のりが良い、しっとりしたフィルム的な階調
+  swivel707: { ccdColor:25, apoSharp:20, microContrast:10, glow:15, toneRolloff:30, crush:0,  grain:0,  colorTemp:45, saturation:40, vignette:10, fieldBlur:0,  softFocus:5,  lightLeak:0,  mono:false }, // Sony DSC-F707：Y2Kデジカメの柔らかさ＋ツァイスレンズ
+  zsonnar:   { ccdColor:20, apoSharp:45, microContrast:30, glow:5,  toneRolloff:20, crush:5,  grain:0,  colorTemp:48, saturation:45, vignette:0,  fieldBlur:20, softFocus:0,  lightLeak:0,  mono:false }, // Sony DSC-R1：大判CMOS×ツァイスの、空気感まで写す解像感。像面の滑らかさにFIELD BLURを軽く
+  k14n:      { ccdColor:75, apoSharp:25, microContrast:25, glow:10, toneRolloff:15, crush:20, grain:25, colorTemp:68, saturation:65, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Kodak DCS Pro 14n：ノイズ・粒状感は賛否ある本物の個性なので維持
+  p67film:   { ccdColor:25, apoSharp:10, microContrast:10, glow:15, toneRolloff:55, crush:0,  grain:20, colorTemp:55, saturation:35, vignette:25, fieldBlur:0,  softFocus:15, lightLeak:0,  mono:false }, // PENTAX 6x7：中判フィルムの粒状感は本質的な特徴なので維持
+  rd1retro:  { ccdColor:40, apoSharp:30, microContrast:25, glow:15, toneRolloff:25, crush:10, grain:0,  colorTemp:45, saturation:45, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Epson R-D1：ライカMマウント×CCDの飾らない実直な発色
+  g2zeiss:   { ccdColor:25, apoSharp:35, microContrast:20, glow:10, toneRolloff:30, crush:5,  grain:0,  colorTemp:50, saturation:45, vignette:10, fieldBlur:35, softFocus:0,  lightLeak:0,  mono:false }, // Contax G2：Planar/Biogonの、中心から周辺への滑らかな像面湾曲をFIELD BLURで再現
+  nrare:     { ccdColor:55, apoSharp:25, microContrast:20, glow:10, toneRolloff:20, crush:15, grain:0,  colorTemp:40, saturation:55, vignette:15, fieldBlur:15, softFocus:0,  lightLeak:0,  mono:false }, // Contax N Digital：世界初フルサイズCCD一眼の、独特の色転びと希少機らしい癖
 };
 
 function setSlider(slider, valEl, value, formatter) {
@@ -501,6 +524,7 @@ patchBtns.forEach(btn => {
     setSlider(colorTempSlider, colorTempVal, p.colorTemp, v => v===50?'中間':(v<50?`寒色${50-v}`:`暖色${v-50}`));
     setSlider(saturationSlider, saturationVal, p.saturation, v => v===50?'中間':(v<50?`-${50-v}`:`+${v-50}`));
     setSlider(vignetteSlider, vignetteVal, p.vignette);
+    setSlider(fieldBlurSlider, fieldBlurVal, p.fieldBlur || 0);
     setSlider(softFocusSlider, softFocusVal, p.softFocus);
     setSlider(lightLeakSlider, lightLeakVal, p.lightLeak);
     monochromeCheckbox.checked = p.mono;
