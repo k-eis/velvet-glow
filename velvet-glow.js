@@ -26,6 +26,7 @@ const fieldBlurSlider = document.getElementById('fieldBlur');
 const softFocusSlider = document.getElementById('softFocus');
 const lightLeakSlider = document.getElementById('lightLeak');
 const monochromeCheckbox = document.getElementById('monochrome');
+const compareModeCheckbox = document.getElementById('compareMode');
 
 const ccdColorVal = document.getElementById('ccdColorVal');
 const apoSharpVal = document.getElementById('apoSharpVal');
@@ -50,6 +51,7 @@ let originalImage = null;
 let originalImageData = null;
 let previewImageData = null;
 let isDragging = false;
+let lastResultImageData = null; // COMPARE MODE用：直近のフル解像度描画結果を保持
 
 // ── ファイル読み込み
 dropZone.addEventListener('click', () => fileInput.click());
@@ -417,6 +419,7 @@ function applyVelvetGlow(preview) {
     ctx.drawImage(tempCanvas, 0, 0, w, h, 0, 0, outputCanvas.width, outputCanvas.height);
   } else {
     ctx.putImageData(resultData, 0, 0);
+    lastResultImageData = resultData; // COMPARE MODE用に保持
   }
 }
 
@@ -514,6 +517,9 @@ patchBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const p = CAMERA_PATCHES[btn.dataset.patch];
     if (!p) return;
+    const compareOn = compareModeCheckbox.checked;
+    const beforeSnapshot = lastResultImageData; // 切り替え前の画像を先に確保しておく
+
     setSlider(ccdColorSlider, ccdColorVal, p.ccdColor);
     setSlider(apoSharpSlider, apoSharpVal, p.apoSharp);
     setSlider(microContrastSlider, microContrastVal, p.microContrast);
@@ -530,7 +536,28 @@ patchBtns.forEach(btn => {
     monochromeCheckbox.checked = p.mono;
     patchBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    requestApply();
+
+    if (driftRAF) { cancelAnimationFrame(driftRAF); driftRAF = null; }
+    canvasBadge.textContent = '処理中… PROCESSING';
+    canvasBadge.style.display = 'block';
+    setTimeout(() => {
+      applyVelvetGlow(false); // 新しいパッチをフル解像度で描画（lastResultImageDataもここで更新される）
+      canvasBadge.textContent = 'PREVIEW';
+
+      const canCompare = compareOn && beforeSnapshot &&
+        beforeSnapshot.width === outputCanvas.width && beforeSnapshot.height === outputCanvas.height;
+      if (canCompare) {
+        canvasBadge.textContent = 'AFTER（新）';
+        setTimeout(() => {
+          ctx.putImageData(beforeSnapshot, 0, 0);
+          canvasBadge.textContent = 'BEFORE（前）';
+          setTimeout(() => {
+            if (lastResultImageData) ctx.putImageData(lastResultImageData, 0, 0);
+            canvasBadge.textContent = 'PREVIEW';
+          }, 2000);
+        }, 2000);
+      }
+    }, 10);
   });
 });
 
