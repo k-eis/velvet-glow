@@ -52,6 +52,7 @@ let originalImageData = null;
 let previewImageData = null;
 let isDragging = false;
 let lastResultImageData = null; // COMPARE MODE用：直近のフル解像度描画結果を保持
+let compareTimeout1 = null, compareTimeout2 = null; // COMPARE MODE用：連打時に前のタイマーを打ち消すため
 
 // ── ファイル読み込み
 dropZone.addEventListener('click', () => fileInput.click());
@@ -538,6 +539,9 @@ patchBtns.forEach(btn => {
     btn.classList.add('active');
 
     if (driftRAF) { cancelAnimationFrame(driftRAF); driftRAF = null; }
+    // 連打対策：前のパッチ切り替えで予約された比較タイマーが残っていたら打ち消す
+    if (compareTimeout1) { clearTimeout(compareTimeout1); compareTimeout1 = null; }
+    if (compareTimeout2) { clearTimeout(compareTimeout2); compareTimeout2 = null; }
     canvasBadge.textContent = '処理中… PROCESSING';
     canvasBadge.style.display = 'block';
     setTimeout(() => {
@@ -548,13 +552,15 @@ patchBtns.forEach(btn => {
         beforeSnapshot.width === outputCanvas.width && beforeSnapshot.height === outputCanvas.height;
       if (canCompare) {
         canvasBadge.textContent = 'AFTER（新）';
-        setTimeout(() => {
+        compareTimeout1 = setTimeout(() => {
           ctx.putImageData(beforeSnapshot, 0, 0);
           canvasBadge.textContent = 'BEFORE（前）';
-          setTimeout(() => {
+          compareTimeout2 = setTimeout(() => {
             if (lastResultImageData) ctx.putImageData(lastResultImageData, 0, 0);
             canvasBadge.textContent = 'PREVIEW';
+            compareTimeout2 = null;
           }, 2000);
+          compareTimeout1 = null;
         }, 2000);
       }
     }, 10);
