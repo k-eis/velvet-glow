@@ -299,6 +299,14 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
       </div>
 
       <div class="ctrl-group">
+        <div class="ctrl-label">
+          <span class="name">SHADOW TINT <span class="jp-small">暗部の色転び（マゼンタ）</span></span>
+          <span class="val" id="shadowTintVal">0%</span>
+        </div>
+        <input type="range" id="shadowTint" min="0" max="100" value="0">
+      </div>
+
+      <div class="ctrl-group">
         <div class="checkbox-row">
           <input type="checkbox" id="monochrome">
           <label for="monochrome">MONOCHROME <span style="opacity:0.6;font-weight:400;">/ Mモノクローム風</span></label>

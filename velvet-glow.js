@@ -25,6 +25,7 @@ const vignetteSlider = document.getElementById('vignette');
 const fieldBlurSlider = document.getElementById('fieldBlur');
 const softFocusSlider = document.getElementById('softFocus');
 const lightLeakSlider = document.getElementById('lightLeak');
+const shadowTintSlider = document.getElementById('shadowTint');
 const monochromeCheckbox = document.getElementById('monochrome');
 const compareModeCheckbox = document.getElementById('compareMode');
 
@@ -41,6 +42,7 @@ const vignetteVal = document.getElementById('vignetteVal');
 const fieldBlurVal = document.getElementById('fieldBlurVal');
 const softFocusVal = document.getElementById('softFocusVal');
 const lightLeakVal = document.getElementById('lightLeakVal');
+const shadowTintVal = document.getElementById('shadowTintVal');
 
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
@@ -211,6 +213,7 @@ function applyVelvetGlow(preview) {
   const fieldBlur = parseInt(fieldBlurSlider.value) / 100;
   const softFocus = parseInt(softFocusSlider.value) / 100;
   const lightLeak = parseInt(lightLeakSlider.value) / 100;
+  const shadowTint = parseInt(shadowTintSlider.value) / 100;
   const mono = monochromeCheckbox.checked;
 
   const src = useData.data;
@@ -340,6 +343,20 @@ function applyVelvetGlow(preview) {
     }
   }
 
+  // ── STEP 6.5: SHADOW TINT（暗部だけ色を転がす。M8のIR感度由来の黒のマゼンタ転びを再現。
+  // 判定基準は輝度のみ——暗いところほど急激に強く効く重みを作り、その分だけR/Bを持ち上げG を落とす）
+  if (shadowTint > 0.01) {
+    for (let i = 0; i < out.length; i += 4) {
+      const r = out[i], g = out[i+1], b = out[i+2];
+      const lum = (r+g+b)/3;
+      const darkWeight = Math.max(0, 1 - lum/110);
+      const amt = darkWeight*darkWeight * shadowTint;
+      out[i]   = Math.max(0, Math.min(255, r + amt*18));
+      out[i+1] = Math.max(0, Math.min(255, g - amt*14));
+      out[i+2] = Math.max(0, Math.min(255, b + amt*18));
+    }
+  }
+
   // ── STEP 7: GRAIN（CCD特有の粒状感。輝度ノイズ＋わずかな色ノイズ）
   if (grain > 0.01) {
     const seedOff = 4000;
@@ -425,7 +442,7 @@ function applyVelvetGlow(preview) {
 }
 
 // ── UIイベント
-const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider, crushSlider, grainSlider, colorTempSlider, saturationSlider, vignetteSlider, fieldBlurSlider, softFocusSlider, lightLeakSlider];
+const allSliders = [ccdColorSlider, apoSharpSlider, microContrastSlider, glowSlider, toneRolloffSlider, crushSlider, grainSlider, colorTempSlider, saturationSlider, vignetteSlider, fieldBlurSlider, softFocusSlider, lightLeakSlider, shadowTintSlider];
 allSliders.forEach(slider => {
   slider.addEventListener('pointerdown', () => { isDragging = true; });
   slider.addEventListener('touchstart', () => { isDragging = true; }, { passive: true });
@@ -464,6 +481,7 @@ vignetteSlider.addEventListener('input', () => { vignetteVal.textContent = vigne
 fieldBlurSlider.addEventListener('input', () => { fieldBlurVal.textContent = fieldBlurSlider.value + '%'; requestApply(); });
 softFocusSlider.addEventListener('input', () => { softFocusVal.textContent = softFocusSlider.value + '%'; requestApply(); });
 lightLeakSlider.addEventListener('input', () => { lightLeakVal.textContent = lightLeakSlider.value + '%'; requestApply(); });
+shadowTintSlider.addEventListener('input', () => { shadowTintVal.textContent = shadowTintSlider.value + '%'; requestApply(); });
 monochromeCheckbox.addEventListener('change', () => applyVelvetGlow());
 
 // ── テーマ切り替え（Optical Glass / Brass × Leather）
@@ -487,7 +505,7 @@ try {
 // sat/tempは50が中間（スライダーの生値）。それ以外は0-100のスライダー生値。
 const CAMERA_PATCHES = {
   init:      { ccdColor:0,  apoSharp:0,  microContrast:0,  glow:0,  toneRolloff:0,  crush:0,  grain:0,  colorTemp:50, saturation:50, vignette:0,  fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // 初期化
-  lvelvet:   { ccdColor:28, apoSharp:20, microContrast:45, glow:8,  toneRolloff:42, crush:5,  grain:4,  colorTemp:46, saturation:42, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  mono:false }, // Leica M8 v2：実写比較の結果を反映。edge sharpeningではなくMICRO CONTRASTを最大の個性に、GLOWとCRUSHを大幅に抑え、TONE ROLLOFFで黒とハイライトに余白を残す
+  lvelvet:   { ccdColor:28, apoSharp:20, microContrast:45, glow:8,  toneRolloff:42, crush:5,  grain:4,  colorTemp:46, saturation:42, vignette:10, fieldBlur:0,  softFocus:0,  lightLeak:0,  shadowTint:22, mono:false }, // Leica M8 v2：実写比較の結果を反映。edge sharpeningではなくMICRO CONTRASTを最大の個性に、GLOWとCRUSHを大幅に抑え、TONE ROLLOFFで黒とハイライトに余白を残す。SHADOW TINTでIR感度由来の黒のマゼンタ転びを再現
   summiluxsoft: { ccdColor:5, apoSharp:8, microContrast:18, glow:22, toneRolloff:60, crush:0, grain:5, colorTemp:54, saturation:44, vignette:12, fieldBlur:15, softFocus:25, lightLeak:0, mono:false }, // Leica Summilux-M 50mm f/1.4 pre-ASPH：レンズの柔らかさが主役。TONE ROLLOFFを最大級に上げ、SOFT FOCUSとFIELD BLURで開放時の空気感を作りつつMICRO CONTRASTだけ芯として残す
   m9:        { ccdColor:42, apoSharp:18, microContrast:32, glow:6,  toneRolloff:20, crush:8,  grain:5,  colorTemp:53, saturation:45, vignette:10, fieldBlur:5,  softFocus:0,  lightLeak:0,  mono:false }, // Leica M9：フルサイズKodak CCDの濃密な色。M8より黒を締め（TONE ROLLOFF低め・CRUSHやや強め）、CCD COLORを高めて「濃い色+深い黒+滑らかな階調」というリッチな方向に
   fvelvet:   { ccdColor:30, apoSharp:5,  microContrast:8,  glow:15, toneRolloff:60, crush:0,  grain:0,  colorTemp:55, saturation:40, vignette:5,  fieldBlur:0,  softFocus:20, lightLeak:0,  mono:false }, // Fuji S5 Pro：実機は色こそX100と同じだが解像感は「等倍でぼやけた感」が本質。APO SHARPNESSを大幅に下げSOFT FOCUSで補強
@@ -538,6 +556,7 @@ patchBtns.forEach(btn => {
     setSlider(fieldBlurSlider, fieldBlurVal, p.fieldBlur || 0);
     setSlider(softFocusSlider, softFocusVal, p.softFocus);
     setSlider(lightLeakSlider, lightLeakVal, p.lightLeak);
+    setSlider(shadowTintSlider, shadowTintVal, p.shadowTint || 0);
     monochromeCheckbox.checked = p.mono;
     patchBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
