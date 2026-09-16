@@ -44,7 +44,7 @@ header { border-bottom: 1px solid var(--line-strong); padding-bottom: 22px; marg
 h1 { font: 300 32px/1.1 var(--sans); letter-spacing: -0.01em; }
 h1 .jp { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 10px; }
 .tagline { font: 400 12px/1.6 var(--sans); color: var(--muted); margin-top: 6px; }
-.private-badge { font: 700 9px/1 var(--mono); color: var(--accent); letter-spacing: 0.08em; margin-top: 8px; border: 1px dashed var(--accent); display: inline-block; padding: 3px 7px; }
+.disclaimer-note { font: 400 9px/1.6 var(--sans); color: var(--muted); margin-top: 10px; max-width: 480px; opacity: 0.75; }
 .version { font: 400 9px/1 var(--mono); color: var(--muted); letter-spacing: 0.1em; text-align: right; }
 
 /* ── テーマ切り替え ── */
@@ -162,7 +162,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
       <h1>Velvet Glow <span class="jp">ビロードのにじみ</span></h1>
       <div class="tagline">Translating the quiet air of a photograph — deep color, quiet sharpness, a soft glow.</div>
       <div class="tagline" style="margin-top:2px; opacity:0.85;">写真の静かな空気感を翻訳する——深い色、静かな解像感、柔らかなにじみ。</div>
-      <div class="private-badge">PERSONAL / UNLISTED</div>
+      <div class="disclaimer-note">Camera and lens names are used for descriptive reference only — not affiliated with or endorsed by any manufacturer. All trademarks belong to their respective owners.<br>実機名・レンズ名は特徴を説明するための参考表記です。各商標は各権利者に帰属し、本アプリはいずれのメーカーとも提携・関係がありません。</div>
     </div>
     <div class="version">© 2026 k-eis studio</div>
   </header>
@@ -194,6 +194,53 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
     </div>
 
     <div class="controls">
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span class="name">CAMERA PATCH <span class="jp-small">20台の個性</span></span></div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="init" style="grid-column: 1 / -1;"><span class="profile-name">初期化</span><span class="profile-desc">Init</span></div>
+        </div>
+
+        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">滲み・柔らかな夢</div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="lvelvet"><span class="profile-name">L Velvet</span><span class="profile-desc">Leica M8 Style</span></div>
+          <div class="profile-btn" data-patch="summiluxsoft"><span class="profile-name">Summilux Soft</span><span class="profile-desc">Leica Summilux-M 50mm Style</span></div>
+          <div class="profile-btn" data-patch="swivel707"><span class="profile-name">7 Swivel</span><span class="profile-desc">Sony DSC-F707 Style</span></div>
+          <div class="profile-btn" data-patch="hdream"><span class="profile-name">H Dream</span><span class="profile-desc">Holga 120N Style</span></div>
+          <div class="profile-btn" data-patch="psonar"><span class="profile-name">P Sonar</span><span class="profile-desc">Polaroid SX-70 Style</span></div>
+        </div>
+
+        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">濃厚な色・フィルム的発色</div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="m9"><span class="profile-name">M9 Rich</span><span class="profile-desc">Leica M9 Style</span></div>
+          <div class="profile-btn" data-patch="fvelvet"><span class="profile-name">F Velvet</span><span class="profile-desc">Fuji S5 Pro Style</span></div>
+          <div class="profile-btn" data-patch="xfilm"><span class="profile-name">X Film</span><span class="profile-desc">Fuji X100 Style</span></div>
+          <div class="profile-btn" data-patch="kmemory"><span class="profile-name">K Memory</span><span class="profile-desc">Kodak P880 Style</span></div>
+          <div class="profile-btn" data-patch="k14n"><span class="profile-name">14n Bold</span><span class="profile-desc">Kodak DCS Pro 14n Style</span></div>
+          <div class="profile-btn" data-patch="gchrome"><span class="profile-name">G Chrome</span><span class="profile-desc">Canon G3 Style</span></div>
+          <div class="profile-btn" data-patch="cnega"><span class="profile-name">C Nega</span><span class="profile-desc">Canon EOS 5D Style</span></div>
+          <div class="profile-btn" data-patch="p67film"><span class="profile-name">67 Film</span><span class="profile-desc">PENTAX 6x7 Style</span></div>
+          <div class="profile-btn" data-patch="czuiko"><span class="profile-name">C Zuiko</span><span class="profile-desc">Olympus C-5050 Style</span></div>
+          <div class="profile-btn" data-patch="nrare"><span class="profile-name">N Rare</span><span class="profile-desc">Contax N Digital Style</span></div>
+        </div>
+
+        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">硬質・解像感</div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="spresence"><span class="profile-name">S Presence</span><span class="profile-desc">Sigma DP2M Style</span></div>
+          <div class="profile-btn" data-patch="ptdeep"><span class="profile-name">Pt Deep</span><span class="profile-desc">Pentax K10D Style</span></div>
+          <div class="profile-btn" data-patch="zsonnar"><span class="profile-name">Z Sonnar</span><span class="profile-desc">Sony DSC-R1 Style</span></div>
+          <div class="profile-btn" data-patch="dwarm"><span class="profile-name">D Warm</span><span class="profile-desc">Nikon D70 Style</span></div>
+          <div class="profile-btn" data-patch="rd1retro"><span class="profile-name">RD1 Retro</span><span class="profile-desc">Epson R-D1 Style</span></div>
+          <div class="profile-btn" data-patch="g2zeiss"><span class="profile-name">G2 Zeiss</span><span class="profile-desc">Contax G2 Style</span></div>
+        </div>
+
+        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">白黒の系譜</div>
+        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="profile-btn" data-patch="rsharp"><span class="profile-name">R Sharp</span><span class="profile-desc">Ricoh GR Style</span></div>
+          <div class="profile-btn" data-patch="mmono"><span class="profile-name">M Mono</span><span class="profile-desc">Leica M Monochrom Style</span></div>
+          <div class="profile-btn" data-patch="trix"><span class="profile-name">Tri-X</span><span class="profile-desc">Kodak Tri-X 400 Style</span></div>
+        </div>
+      </div>
+
       <div class="ctrl-group">
         <div class="ctrl-label">
           <span class="name">CCD COLOR <span class="jp-small">色再現</span></span>
@@ -314,53 +361,6 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
         <div class="checkbox-row" style="margin-top:8px;">
           <input type="checkbox" id="compareMode">
           <label for="compareMode">COMPARE MODE <span style="opacity:0.6;font-weight:400;">/ パッチ切替時に前の画像と2秒ずつ比較</span></label>
-        </div>
-      </div>
-
-      <div class="ctrl-group">
-        <div class="ctrl-label"><span class="name">CAMERA PATCH <span class="jp-small">20台の個性</span></span></div>
-        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="profile-btn" data-patch="init" style="grid-column: 1 / -1;"><span class="profile-name">初期化</span><span class="profile-desc">Init</span></div>
-        </div>
-
-        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">滲み・柔らかな夢</div>
-        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="profile-btn" data-patch="lvelvet"><span class="profile-name">L Velvet</span><span class="profile-desc">Leica M8</span></div>
-          <div class="profile-btn" data-patch="summiluxsoft"><span class="profile-name">Summilux Soft</span><span class="profile-desc">Leica Summilux-M 50mm</span></div>
-          <div class="profile-btn" data-patch="swivel707"><span class="profile-name">7 Swivel</span><span class="profile-desc">Sony DSC-F707</span></div>
-          <div class="profile-btn" data-patch="hdream"><span class="profile-name">H Dream</span><span class="profile-desc">Holga 120N</span></div>
-          <div class="profile-btn" data-patch="psonar"><span class="profile-name">P Sonar</span><span class="profile-desc">Polaroid SX-70</span></div>
-        </div>
-
-        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">濃厚な色・フィルム的発色</div>
-        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="profile-btn" data-patch="m9"><span class="profile-name">M9 Rich</span><span class="profile-desc">Leica M9</span></div>
-          <div class="profile-btn" data-patch="fvelvet"><span class="profile-name">F Velvet</span><span class="profile-desc">Fuji S5 Pro</span></div>
-          <div class="profile-btn" data-patch="xfilm"><span class="profile-name">X Film</span><span class="profile-desc">Fuji X100</span></div>
-          <div class="profile-btn" data-patch="kmemory"><span class="profile-name">K Memory</span><span class="profile-desc">Kodak P880</span></div>
-          <div class="profile-btn" data-patch="k14n"><span class="profile-name">14n Bold</span><span class="profile-desc">Kodak DCS Pro 14n</span></div>
-          <div class="profile-btn" data-patch="gchrome"><span class="profile-name">G Chrome</span><span class="profile-desc">Canon G3</span></div>
-          <div class="profile-btn" data-patch="cnega"><span class="profile-name">C Nega</span><span class="profile-desc">Canon EOS 5D</span></div>
-          <div class="profile-btn" data-patch="p67film"><span class="profile-name">67 Film</span><span class="profile-desc">PENTAX 6x7</span></div>
-          <div class="profile-btn" data-patch="czuiko"><span class="profile-name">C Zuiko</span><span class="profile-desc">Olympus C-5050</span></div>
-          <div class="profile-btn" data-patch="nrare"><span class="profile-name">N Rare</span><span class="profile-desc">Contax N Digital</span></div>
-        </div>
-
-        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">硬質・解像感</div>
-        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="profile-btn" data-patch="spresence"><span class="profile-name">S Presence</span><span class="profile-desc">Sigma DP2M</span></div>
-          <div class="profile-btn" data-patch="ptdeep"><span class="profile-name">Pt Deep</span><span class="profile-desc">Pentax K10D</span></div>
-          <div class="profile-btn" data-patch="zsonnar"><span class="profile-name">Z Sonnar</span><span class="profile-desc">Sony DSC-R1</span></div>
-          <div class="profile-btn" data-patch="dwarm"><span class="profile-name">D Warm</span><span class="profile-desc">Nikon D70</span></div>
-          <div class="profile-btn" data-patch="rd1retro"><span class="profile-name">RD1 Retro</span><span class="profile-desc">Epson R-D1</span></div>
-          <div class="profile-btn" data-patch="g2zeiss"><span class="profile-name">G2 Zeiss</span><span class="profile-desc">Contax G2</span></div>
-        </div>
-
-        <div style="font:600 9px/1 var(--mono); color:var(--muted); letter-spacing:0.08em; margin:14px 0 6px;">白黒の系譜</div>
-        <div class="profile-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="profile-btn" data-patch="rsharp"><span class="profile-name">R Sharp</span><span class="profile-desc">Ricoh GR</span></div>
-          <div class="profile-btn" data-patch="mmono"><span class="profile-name">M Mono</span><span class="profile-desc">Leica M Monochrom</span></div>
-          <div class="profile-btn" data-patch="trix"><span class="profile-name">Tri-X</span><span class="profile-desc">Kodak Tri-X 400</span></div>
         </div>
       </div>
 
