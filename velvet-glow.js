@@ -193,12 +193,13 @@ function boxBlur(data, w, h, radius) {
   return out;
 }
 
-function applyVelvetGlow(preview) {
-  if (!originalImageData) return;
-
-  const useData = (preview && previewImageData) ? previewImageData : originalImageData;
+// ── フィルター本体（解像度に依存しない純関数）
+// radiusScale：基準解像度（画面用キャンバス＝最大幅900px）に対する横幅の比率。
+//   ぼかし半径・粒子の大きさをこの比率に合わせることで、どの解像度でも同じ見た目になる。
+//   プレビュー=約0.36／画面表示=1／高解像度書き出し=1より大きい値
+function renderVelvetGlow(useData, radiusScale) {
   const w = useData.width, h = useData.height;
-  const radiusScale = preview ? (w / outputCanvas.width) : 1;
+  const grainScale = Math.max(1, radiusScale); // 高解像度では粒子も同じ比率で大きくする
 
   const ccdColor = parseInt(ccdColorSlider.value) / 100;
   const apoSharp = parseInt(apoSharpSlider.value) / 100;
@@ -363,9 +364,10 @@ function applyVelvetGlow(preview) {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y*w+x)*4;
-        const n = (pseudoRandom2D(x+seedOff, y+seedOff) - 0.5) * 2;
+        const gx = Math.floor(x / grainScale), gy = Math.floor(y / grainScale);
+        const n = (pseudoRandom2D(gx+seedOff, gy+seedOff) - 0.5) * 2;
         const lumNoise = n * grain * 24;
-        const cn = (pseudoRandom2D(x-seedOff, y+seedOff) - 0.5) * 2;
+        const cn = (pseudoRandom2D(gx-seedOff, gy+seedOff) - 0.5) * 2;
         const chromaNoise = cn * grain * 8;
         out[i]   = out[i]   + lumNoise + chromaNoise;
         out[i+1] = out[i+1] + lumNoise;
@@ -426,7 +428,16 @@ function applyVelvetGlow(preview) {
     }
   }
 
-  const resultData = new ImageData(out, w, h);
+  return new ImageData(out, w, h);
+}
+
+function applyVelvetGlow(preview) {
+  if (!originalImageData) return;
+
+  const useData = (preview && previewImageData) ? previewImageData : originalImageData;
+  const w = useData.width, h = useData.height;
+  const radiusScale = preview ? (w / outputCanvas.width) : 1;
+  const resultData = renderVelvetGlow(useData, radiusScale);
 
   if (preview && previewImageData) {
     let tempCanvas = applyVelvetGlow._tempCanvas;
@@ -590,33 +601,89 @@ patchBtns.forEach(btn => {
   });
 });
 
+// ── 高解像度での書き出し
+// 画面上のキャンバスは軽さのため最大幅900pxだが、保存時だけ元写真の解像度（長辺の上限あり）で
+// フィルターをかけ直す。スマホのメモリ対策として上限を設け、失敗したら小さいサイズで再試行する。
+const EXPORT_MAX_LONG_SIDE = 2400;
+const EXPORT_FALLBACK_LONG_SIDE = 1600;
+
+function renderExportCanvas(longSide) {
+  const nw = originalImage.naturalWidth || originalImage.width;
+  const nh = originalImage.naturalHeight || originalImage.height;
+  const s = Math.min(1, longSide / Math.max(nw, nh));
+  const ew = Math.max(1, Math.round(nw * s));
+  const eh = Math.max(1, Math.round(nh * s));
+  if (ew <= outputCanvas.width) return null; // 画面用と同じかそれ以下なら、今のキャンバスをそのまま保存
+
+  const c = document.createElement('canvas');
+  c.width = ew; c.height = eh;
+  const cctx = c.getContext('2d');
+  cctx.imageSmoothingEnabled = true;
+  cctx.imageSmoothingQuality = 'high';
+  cctx.drawImage(originalImage, 0, 0, ew, eh);
+  const base = cctx.getImageData(0, 0, ew, eh);
+  const result = renderVelvetGlow(base, ew / outputCanvas.width);
+  cctx.putImageData(result, 0, 0);
+  return c;
+}
+
 downloadBtn.addEventListener('click', () => {
-  try {
-    const dataUrl = outputCanvas.toDataURL('image/png');
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOS) {
-      showSaveOverlay(dataUrl);
-    } else {
-      const link = document.createElement('a');
-      link.download = 'velvet-glow.png';
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  if (!originalImage) return;
+  const prevBadgeText = canvasBadge.textContent;
+  canvasBadge.textContent = '高解像度で書き出し中… EXPORTING';
+  canvasBadge.style.display = 'block';
+  downloadBtn.disabled = true;
+
+  const finish = () => {
+    canvasBadge.textContent = prevBadgeText;
+    downloadBtn.disabled = false;
+  };
+
+  // バッジを表示してから重い処理に入る
+  setTimeout(() => {
+    try {
+      let exportCanvas = null;
+      for (const size of [EXPORT_MAX_LONG_SIDE, EXPORT_FALLBACK_LONG_SIDE]) {
+        try { exportCanvas = renderExportCanvas(size); break; }
+        catch (err) { console.warn('書き出しサイズを下げて再試行します:', size, err); exportCanvas = null; }
+      }
+      const target = exportCanvas || outputCanvas;
+
+      target.toBlob((blob) => {
+        finish();
+        if (!blob) {
+          alert('画像の保存に失敗しました。ブラウザを再読み込みしてもう一度お試しください。');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+          showSaveOverlay(url);
+        } else {
+          const link = document.createElement('a');
+          link.download = 'velvet-glow.png';
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+      }, 'image/png');
+    } catch (err) {
+      console.error('PNG保存に失敗しました:', err);
+      finish();
+      alert('画像の保存に失敗しました。ブラウザを再読み込みしてもう一度お試しください。');
     }
-  } catch (err) {
-    console.error('PNG保存に失敗しました:', err);
-    alert('画像の保存に失敗しました。ブラウザを再読み込みしてもう一度お試しください。');
-  }
+  }, 30);
 });
 
-function showSaveOverlay(dataUrl) {
+function showSaveOverlay(imageUrl) {
   const overlay = document.createElement('div');
   overlay.style.cssText = `position: fixed; inset: 0; z-index: 9999; background: rgba(10,10,10,0.96);
     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;`;
   const img = document.createElement('img');
-  img.src = dataUrl;
+  img.src = imageUrl;
   img.style.cssText = 'max-width: 100%; max-height: 75vh; border-radius: 2px;';
   const hint = document.createElement('p');
   hint.innerHTML = '画像を長押しして「写真に保存」を選んでください<br><span style="color:#888; font-size:11px;">Press and hold the image, then tap "Save to Photos"</span>';
@@ -624,7 +691,7 @@ function showSaveOverlay(dataUrl) {
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '閉じる / Close';
   closeBtn.style.cssText = `margin-top: 20px; padding: 10px 24px; background: transparent; color: white; border: 1px solid #666; border-radius: 2px; font-family: sans-serif; font-size: 13px; cursor: pointer;`;
-  closeBtn.addEventListener('click', () => overlay.remove());
+  closeBtn.addEventListener('click', () => { overlay.remove(); if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); });
   overlay.appendChild(img); overlay.appendChild(hint); overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
 }
